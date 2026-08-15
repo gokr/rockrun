@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-15
+
+Bigger window, finer sand, three rock sizes and custom graphics.
+
+### Added
+
+- Two-tier sand subdivision: 32px sand blocks start coarse with a seamless
+  2x2-tiled texture and silently split into four 16px blocks near the
+  player. Cuts physics body count by ~4x versus a fully fine cave while
+  digging stays granular.
+- Boulders in three sizes (BoulderSmall/Boulder/BoulderBig, marked
+  o/O/Q in level data) with auto-sized physics spheres matching visuals.
+- Procedural textures via `tools/genassets.py` (CC0): rocky boulders in
+  three seeds, faceted teal diamond, organic 16px-friendly sand.
+
+### Changed
+
+- Window now 1280x720 with proportionally larger HUD text and messages.
+- Physics parts sized to match their graphics (boulder = auto sphere of
+  object's size, player box 26px, gem solid 27px + 30px collection sensor).
+- Player scale 0.5 with a 26px physics box; physics-design note retained:
+  dynamic bodies stay slightly smaller than the 32px cell.
+
+### Fixed
+
+- Sand refinement could leave a stale sub-block pointer after contact
+  destruction; now unlinked centrally in `destroySmallSand`.
+- Contact-kind matching is prefix-based so Sand32/Sand16/BoulderSmall/
+  BoulderBig classify correctly.
+
 ## [0.1.0] - 2026-08-15
 
 First working release.
