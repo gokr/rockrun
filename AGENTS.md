@@ -18,8 +18,12 @@ music, SFX, particle/FX juice, a scroll-following camera and three caves.
 - `src/contacts.nim` — PHYSICS contact event queue and rules. ORX events
   arrive during Box2D steps, so bodies are never mutated there; contacts are
   drained once per frame afterwards.
-- `src/movement.nim` — player input (keyboard + d-pad + analog axes) and
-  velocity control; calls `world.digAround`.
+- `src/movement.nim` — player input (keyboard + d-pad + analog axes),
+  velocity control and the idle/run/dig animation state machine; calls
+  `world.digAround`.
+- `src/creatures.nim` — fireflies/butterflies: wall-hugging steering
+  decisions at cell centers against a static occupancy map (walls + live
+  sand), explosion into diamonds when crushed.
 - `src/ui.nim` — HUD text objects and transient centered messages.
 - `src/screenshots.nim` — PNG capture helper.
 - `tools/genlevels.py` — deterministic seeded cave generator; writes
@@ -63,11 +67,17 @@ Also re-generate levels after changing `tools/genlevels.py`:
 - Text objects need BOTH `Graphic = @` and `Text = @` sections.
 - Pure coordinates: 1 pixel = 1 world unit; physics `DimensionRatio 0.01`.
 - Static cells (dirt/wall) have full 32px bodies forming a lattice; dynamic
-  entities are SMALLER than the cell (player box 26px, boulder r=13.5, gem
+  entities are SMALLER than the cell (player box 26px, boulder r=16, gem
   22px) — full-size dynamic bodies wedge into the lattice and freeze.
+- Sand is two-tier: 32px blocks (Repeat 3x3 texture) silently refine into
+  nine 10.7px blocks (`SubGrid`/`SubBlock` in world.nim) near the player.
 - The player has `CustomGravity = (0, 0, 0)` (classic BD anti-gravity). Dig
   happens by direction-aware proximity (`world.digAround`), floors require a
   downward input.
+- Text objects need `Graphic = @` and `Text = @` plus `Font = GameFont`;
+  fonts live in data/font (added to the Texture storage group).
+- ORX animations: `[PlayerAnimSet]` lists `Animation = Name # frames # ...`
+  and the hero strip is 4 idle + 6 run + 3 dig frames at 24px.
 - HUD lives in a second viewport; ORX draws viewports first-created-first,
   and HUD objects are Z-separated so the main camera never renders them.
 - ORX needs the ini named after the executable: keep `rockrun.ini` in sync
