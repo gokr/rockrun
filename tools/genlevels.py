@@ -25,8 +25,11 @@ def carve(g, x0, y0, x1, y1):
             g[y][x] = EMPTY
 
 
+BOULDER_ANY = {'o', 'O', 'Q'}
+
+
 def supported(g, x, y):
-    return g[y + 1][x] in (DIRT, WALL, BOULDER, GEM)
+    return g[y + 1][x] in (DIRT, WALL, GEM) or g[y + 1][x] in BOULDER_ANY
 
 
 def scatter(g, rng, w, h, symbol, count, reserved, bands):
@@ -61,7 +64,7 @@ def emit(name, section, g, needed, time_limit):
     # nothing may start mid-air
     for y in range(h - 2):
         for x in range(w):
-            if g[y][x] in (BOULDER, GEM):
+            if g[y][x] in BOULDER_ANY or g[y][x] == GEM:
                 assert supported(g, x, y), (name, x, y, g[y][x])
     print(f"-- {name}: {w}x{h}, {len([r for r in rows for c in r if c == BOULDER])} boulders, {gems} diamonds (need {needed})\n"
           + "\n".join(rows) + "\n")
@@ -99,9 +102,14 @@ def level1():
     carve(g, 35, 18, 37, 17)
     carve(g, 35, 19, 37, 19)
     g[ey][ex] = EXIT
-    # boulders on dirt shelves (upper bands) + a few guarding the caverns
+    # boulders on dirt shelves: mostly normal, some small, few big
     bands = [(2, 3, 27, 6), (5, 14, 19, 15), (23, 11, 28, 11), (13, 18, 20, 18), (32, 4, 37, 6)]
-    scatter(g, rng, w, h, BOULDER, 14, reserved, bands)
+    placed = scatter(g, rng, w, h, BOULDER, 14, reserved, bands)
+    for i, (bx, by) in enumerate(placed):
+        if i % 5 == 3:
+            g[by][bx] = 'o'
+        elif i % 7 == 6:
+            g[by][bx] = 'Q'
     # gems: corridor one already placed; others in dirt + some in cavern floors
     gbands = [(2, 4, 20, 9), (9, 12, 17, 13), (4, 16, 12, 17), (21, 8, 38, 13), (13, 18, 20, 19)]
     scatter(g, rng, w, h, GEM, 12, reserved, gbands)
@@ -133,7 +141,12 @@ def level2():
     g[ey][ex] = EXIT
     bands = [(17, 9, 31, 9), (11, 4, 15, 8), (33, 4, 37, 8), (40, 6, 45, 12),
              (18, 17, 30, 17), (12, 18, 24, 18), (29, 20, 43, 20), (2, 6, 8, 12)]
-    scatter(g, rng, w, h, BOULDER, 24, reserved, bands)
+    placed = scatter(g, rng, w, h, BOULDER, 24, reserved, bands)
+    for i, (bx, by) in enumerate(placed):
+        if i % 4 == 2:
+            g[by][bx] = 'o'
+        elif i % 6 == 5:
+            g[by][bx] = 'Q'
     gbands = [(6, 6, 45, 23), (16, 14, 32, 16), (12, 19, 24, 20), (28, 21, 44, 22)]
     scatter(g, rng, w, h, GEM, 24, reserved, gbands)
     return emit("Rolling Fields", "Level2", g, 16, 260)
@@ -164,7 +177,12 @@ def level3():
     reserved |= {(w // 2 - 2, h - 4), (w // 2 + 2, h - 4)}
     bands = [(3, 4, 19, 10), (28, 6, 44, 7), (7, 13, 19, 13), (28, 13, 41, 13),
              (9, 20, 39, 20), (21, 14, 26, 14), (2, 16, 17, 19)]
-    scatter(g, rng, w, h, BOULDER, 30, reserved, bands)
+    placed = scatter(g, rng, w, h, BOULDER, 30, reserved, bands)
+    for i, (bx, by) in enumerate(placed):
+        if i % 4 == 1:
+            g[by][bx] = 'o'
+        elif i % 5 == 4:
+            g[by][bx] = 'Q'
     gbands = [(4, 4, 44, 23), (6, 16, 20, 18), (27, 10, 42, 12), (8, 21, 40, 22)]
     scatter(g, rng, w, h, GEM, 30, reserved, gbands)
     return emit("Deep Vault", "Level3", g, 20, 320)
