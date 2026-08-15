@@ -17,14 +17,22 @@ diamonds to open the exit, and get out before the clock or a boulder gets you.
   and roll off each other with sphere dynamics, gems sparkle and clink when
   they land, and a boulder moving fast enough crushes the player.
 - **A proper hero** — the player is a dynamic body with custom zero gravity
-  (classic BD free movement) you steer through the cave with analog precision.
+  (classic BD free movement) you steer through the cave with analog
+  precision, animated with idle/run/dig sprite cycles (Kenney adventurer).
+- **Fireflies and butterflies** — classic wall huggers. Fireflies keep the
+  wall on their left, butterflies on their right, they move between cells
+  with deterministic turning decisions, kill you on touch, and a boulder
+  falling fast enough crushes one into a burst of nine diamonds.
 - **Two-tier sand subdivision** — caves start as coarse 32px sand blocks
-  (seamlessly textured) that silently split into four 16px blocks near the
-  player. Fine-grained digging, coarse-grained body count.
+  (seamlessly textured) that silently split into nine 10.7px blocks near
+  the player. Fine-grained digging, coarse-grained body count.
 - **Boulders in three sizes**, from pea rocks to boulder slabs, each with a
   physics sphere matching its visual.
 - **Procedurally generated textures** (`tools/genassets.py`): rocky
-  boulders, faceted teal gems and organic sand - regenerated deterministically.
+  boulders, faceted teal gems, organic sand, firefly and butterfly
+  sprites - regenerated deterministically.
+- **Retro pixel HUD font** (Press Start 2P, SIL OFL) rendering the score,
+  gem quota, timer, lives and cave name on a screen-aligned layer.
 - **Full game controller support** — digital d-pad *and* analog left-stick
   movement, Start to pause, A/Start to confirm, Back to quit, plus full
   keyboard controls. Joystick bindings live in config (`data/config/rockrun.ini`).
@@ -128,7 +136,6 @@ Game code is MIT licensed (see LICENSE).
 
 ## Roadmap ideas
 
-- Enemy types (fireflies moving along walls, amoeba growth)
 - Magic walls that transform falling rocks into gems for a limited time
 - Gamepad rumble on crushing/thuds
 - More caves, cave editor tooling

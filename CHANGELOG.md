@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-16
+
+Creatures, readable retro font and an animated hero.
+
+### Added
+
+- Fireflies and butterflies: classic wall huggers that move smoothly
+  between cell centers with deterministic turn decisions (firefly keeps
+  the wall left, butterfly right), kill the player on touch, and burst
+  into nine diamonds when crushed by a fast-falling boulder.
+- Procedural firefly/butterfly sprites in `tools/genassets.py`.
+- Press Start 2P pixel font (SIL OFL) for the whole HUD; much more
+  readable than the built-in font at the same size.
+- Animated adventurer hero (Kenney Pixel Platformer, CC0): 13-frame
+  strip with idle/run/dig cycles, switched by `movement.updatePlayer`.
+
+### Changed
+
+- Fine sand now splits into 3x3 blocks (10.7px) instead of 2x2 for a
+  finer dig feel; seamless swap kept via `Repeat = (3, 3)` on the coarse
+  block texture.
+- Boulder scale jitter removed so adjacent rocks physically touch.
+- Cave 2 redesign: tunnels into the central hall for clearer routing.
+- Dig scanning is windowed around the player with cached static cell
+  centers (per-frame ORX calls no longer scale with the whole cave).
+
+### Fixed
+
+- Creature steering uses a static occupancy map (walls + live sand)
+  instead of physics queries.
+
 ## [0.2.0] - 2026-08-15
 
 Bigger window, finer sand, three rock sizes and custom graphics.
