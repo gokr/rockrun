@@ -1,5 +1,10 @@
 ## World management for Rockrun: level parsing, spawning, digging,
 ## collecting, and destruction of ORX objects with physics bodies.
+##
+## Sand uses two-tier subdivision: caves start as 32px blocks textured
+## identically to four 16px blocks (Repeat 2x2), and blocks near the
+## player are swapped for four small blocks - invisible visually, but much
+## cheaper than keeping the whole cave fine-grained.
 import sets
 import norx
 import game
@@ -20,10 +25,23 @@ type
     timeLimit*: float32
     rows*: seq[string]
 
+  SandCell* = object
+    ## One 32px cave cell either holding a big block or four refined
+    ## 16px blocks.
+    big*: ptr orxOBJECT
+    refined*: bool
+    subs*: array[4, ptr orxOBJECT]
+
+const
+  ## Sub-block center offsets inside a 32px cell.
+  SubOffsets: array[4, tuple[x, y: float32]] =
+    [(-8.0'f32, -8.0'f32), (8.0'f32, -8.0'f32),
+     (-8.0'f32, 8.0'f32), (8.0'f32, 8.0'f32)]
+
 var
   worldW*, worldH*: int
   worldMinX*, worldMaxX*, worldMinY*, worldMaxY*: float32
-  cells*: seq[CellKind]
+  sandCells*: seq[SandCell]
   player*: ptr orxOBJECT
   exitObject*: ptr orxOBJECT
   boulders*: seq[ptr orxOBJECT]
@@ -58,9 +76,6 @@ proc readLevel*(index: int; level: var LevelDef): bool =
   if level.rows.len == 0:
     echo "Level ", section, " has no rows"
     return false
-  when defined(debugLevels):
-    echo "Level ", section, " rowCount=", level.rows.len,
-         " first row=[", level.rows[0], "]"
 
   let width = level.rows[0].len
   for i, row in level.rows:
@@ -74,6 +89,13 @@ proc cellWorld*(x, y: int): orxVECTOR =
   ## World position of the center of a cell; the cave is centered at 0,0.
   newVector(worldMinX + (x.float32 + 0.5'f32) * CellSize,
             worldMinY + (y.float32 + 0.5'f32) * CellSize, 0.0)
+
+proc cellOf*(position: orxVECTOR): tuple[x, y: int] =
+  ## Cave cell coordinates containing a world position.
+  result = (int((position.fX - worldMinX) / CellSize),
+            int((position.fY - worldMinY) / CellSize))
+
+proc cellIndex(x, y: int): int = y * worldW + x
 
 proc objectKind*(gameObject: ptr orxOBJECT): string =
   ## Config section the object was created from.
@@ -111,35 +133,82 @@ proc spawnBurst*(configName: string; position: orxVECTOR; count = 3) =
     if puff != nil:
       discard puff.setPosition(position)
 
-proc cellIndex(x, y: int): int = y * worldW + x
-
-proc destroyDirt*(dirt: ptr orxOBJECT; sound = true) =
-  let position = dirt.getWorldPosition()
+proc destroySmallSand*(gameObject: ptr orxOBJECT) =
+  ## Digs out a 16px sand block: dust, sound and score.
+  if gameObject == nil:
+    return
+  let position = gameObject.getWorldPosition()
   spawnBurst("DustPuff", position, 2)
-  if sound and player != nil and
-      gs.worldClockTime - gs.lastDig >= 0.11'f32:
+  # Unlink from the owning cell so later passes never see a stale pointer.
+  let (cx, cy) = cellOf(position)
+  if cx >= 0 and cx < worldW and cy >= 0 and cy < worldH:
+    var cell = addr sandCells[cellIndex(cx, cy)]
+    for i in 0 ..< 4:
+      if cell.subs[i] == gameObject:
+        cell.subs[i] = nil
+  if player != nil and gs.worldClockTime - gs.lastDig >= 0.11'f32:
     gs.lastDig = gs.worldClockTime
     discard player.addSound("DigSound")
-  destroyObject(dirt)
+  destroyObject(gameObject)
   gs.dirtDug += 1
   addScore(gs.digScore)
+  gs.hudDirty = true
+
+proc refineSand*(gameObject: ptr orxOBJECT) =
+  ## Replaces a 32px sand block by four 16px blocks at the same spot.
+  if gameObject == nil:
+    return
+  let (cx, cy) = cellOf(gameObject.getWorldPosition())
+  if cx < 0 or cx >= worldW or cy < 0 or cy >= worldH:
+    return
+  var cell = addr sandCells[cellIndex(cx, cy)]
+  if cell.refined or cell.big != gameObject:
+    return
+  let center = cellWorld(cx, cy)
+  destroyObject(cell.big)
+  cell.big = nil
+  for i, offset in SubOffsets:
+    let sub = objectCreateFromConfig("Sand16")
+    if sub != nil:
+      discard sub.setPosition(
+        newVector(center.fX + offset.x, center.fY + offset.y, 0.0))
+      dirts.add(sub)
+      cell.subs[i] = sub
+  cell.refined = true
+
+proc digSand*(gameObject: ptr orxOBJECT) =
+  ## Contact-triggered digging: refine big blocks, destroy small ones.
+  case objectKind(gameObject)
+  of "Sand32": refineSand(gameObject)
+  of "Sand16": destroySmallSand(gameObject)
+  else: discard
 
 proc digAround*(origin: orxVECTOR; dirX, dirY: float32) =
-  ## Digs dirt immediately ahead of the player's movement direction.
-  ## The dynamic player body is a bit smaller than the grid, so the reach
-  ## threshold of 31 units makes a push dig right before contact while the
-  ## floor underneath (a full cell away, 32 units) stays in place until the
-  ## player actively burrows down.
-  for i in countdown(dirts.high, 0):
-    let position = dirts[i].getWorldPosition()
-    let dx = position.fX - origin.fX
-    let dy = position.fY - origin.fY
-    let horizontal = dirX != 0.0 and dx * dirX > 0.0 and
-                     abs(dx) < 31.0 and abs(dy) < 22.0
-    let vertical = dirY != 0.0 and dy * dirY > 0.0 and
-                   abs(dx) < 22.0 and abs(dy) < 31.0
-    if horizontal or vertical:
-      destroyDirt(dirts[i])
+  ## Digs/refines sand immediately ahead of the player's movement.
+  ## Small 16px blocks in the dig path are removed; 32px blocks swapped.
+  for cell in sandCells.mitems:
+    if cell.refined:
+      let live = cell.subs
+      for sub in live:
+        if sub == nil:
+          continue
+        let position = sub.getWorldPosition()
+        let dx = position.fX - origin.fX
+        let dy = position.fY - origin.fY
+        let horizontal = dirX != 0.0 and dx * dirX > 0.0 and
+                         abs(dx) < 30.0 and abs(dy) < 24.0
+        let vertical = dirY != 0.0 and dy * dirY > 0.0 and
+                       abs(dx) < 24.0 and abs(dy) < 30.0
+        if horizontal or vertical:
+          destroySmallSand(sub)
+    elif cell.big != nil:
+      let position = cell.big.getWorldPosition()
+      let dx = position.fX - origin.fX
+      let dy = position.fY - origin.fY
+      let near = (dirX != 0.0 and abs(dx) < 34.0 and abs(dy) < 30.0) or
+                 (dirY != 0.0 and abs(dx) < 30.0 and abs(dy) < 34.0)
+      if near:
+        refineSand(cell.big)
 
 proc collectGem*(gem: ptr orxOBJECT) =
   ## Picks up a diamond: score, sparkle, and exit bookkeeping.
@@ -183,11 +252,11 @@ proc clearWorld*() =
   boulders.setLen(0)
   gems.setLen(0)
   dirts.setLen(0)
+  sandCells.setLen(0)
   destroyObject(exitObject)
   exitObject = nil
   destroyObject(player)
   player = nil
-  cells.setLen(0)
 
 proc buildWorld(level: LevelDef): bool =
   ## Instantiates all level objects from a parsed definition.
@@ -198,7 +267,7 @@ proc buildWorld(level: LevelDef): bool =
   worldMaxX = -worldMinX
   worldMinY = -worldH.float32 * CellSize * 0.5'f32
   worldMaxY = -worldMinY
-  cells = newSeq[CellKind](worldW * worldH)
+  sandCells = newSeq[SandCell](worldW * worldH)
 
   var playerCount, exitCount = 0
   for y, row in level.rows:
@@ -206,27 +275,27 @@ proc buildWorld(level: LevelDef): bool =
       let position = cellWorld(x, y)
       case symbol
       of '#':
-        cells[cellIndex(x, y)] = cWall
         let wall = objectCreateFromConfig("Wall")
         if wall == nil or wall.setPosition(position).isFailure:
           echo "Could not create a wall at ", x, ",", y
           return false
       of '.':
-        cells[cellIndex(x, y)] = cDirt
-        let dirt = objectCreateFromConfig("Dirt")
-        if dirt == nil or dirt.setPosition(position).isFailure:
-          echo "Could not create dirt at ", x, ",", y
+        let sand = objectCreateFromConfig("Sand32")
+        if sand == nil or sand.setPosition(position).isFailure:
+          echo "Could not create sand at ", x, ",", y
           return false
-        dirts.add(dirt)
-      of 'O':
-        cells[cellIndex(x, y)] = cBoulder
-        let boulder = objectCreateFromConfig("Boulder")
+        dirts.add(sand)
+        sandCells[cellIndex(x, y)].big = sand
+      of 'o', 'O', 'Q':
+        let configName =
+          (if symbol == 'o': "BoulderSmall"
+           elif symbol == 'Q': "BoulderBig" else: "Boulder")
+        let boulder = objectCreateFromConfig(configName)
         if boulder == nil or boulder.setPosition(position).isFailure:
           echo "Could not create a boulder at ", x, ",", y
           return false
         boulders.add(boulder)
       of 'D':
-        cells[cellIndex(x, y)] = cGem
         let gem = objectCreateFromConfig("Diamond")
         if gem == nil or gem.setPosition(position).isFailure:
           echo "Could not create a diamond at ", x, ",", y
@@ -235,19 +304,17 @@ proc buildWorld(level: LevelDef): bool =
         gems.add(gem)
         inc gs.gemTotal
       of 'E':
-        cells[cellIndex(x, y)] = cExit
         exitObject = objectCreateFromConfig("Exit")
         if exitObject == nil or exitObject.setPosition(position).isFailure:
           echo "Could not create the exit"
           return false
         inc exitCount
       of '@':
-        cells[cellIndex(x, y)] = cEmpty
         playerSpawnX = x
         playerSpawnY = y
         inc playerCount
       of ' ':
-        cells[cellIndex(x, y)] = cEmpty
+        discard
       else:
         echo "Unknown level symbol '", symbol, "' at ", x, ",", y
         return false
@@ -260,8 +327,7 @@ proc buildWorld(level: LevelDef): bool =
     echo "Level has not enough diamonds"
     return false
 
-  player = objectCreateFromConfig(
-    (if defined(testBoulderPlayer): "Boulder" else: "Player"))
+  player = objectCreateFromConfig("Player")
   if player == nil:
     echo "Could not create the player"
     return false
@@ -300,7 +366,7 @@ proc validateLevels*(): bool =
         of '@': inc players
         of 'E': inc exits
         of 'D': inc gemCount
-        of ' ', '#', '.', 'O': discard
+        of ' ', '#', '.', 'o', 'O', 'Q': discard
         else:
           echo "Startup check failed: unknown symbol '", symbol,
                "' in level ", i + 1

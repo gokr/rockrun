@@ -44,6 +44,7 @@ type
 var
   mainViewport, hudViewport: ptr orxVIEWPORT
   mainCamera: ptr orxCAMERA
+  cameraHalfW, cameraHalfH: float32
   coreClock: ptr orxCLOCK
   audioObject: ptr orxOBJECT
   dyingHandled = false
@@ -103,8 +104,8 @@ proc updateCamera(deltaTime: float32) =
   discard getPosition(mainCamera, addr cameraPosition)
 
   let
-    halfFreeX = max(0.0'f32, worldMaxX - 480.0'f32)
-    halfFreeY = max(0.0'f32, worldMaxY - 270.0'f32)
+    halfFreeX = max(0.0'f32, worldMaxX - cameraHalfW)
+    halfFreeY = max(0.0'f32, worldMaxY - cameraHalfH)
     targetX = clamp(target.fX, -halfFreeX, halfFreeX)
     targetY = clamp(target.fY, -halfFreeY, halfFreeY)
     alpha = 1.0'f32 - exp(-CameraLerpRate * deltaTime)
@@ -199,8 +200,8 @@ proc runTestScript(deltaTime: float32) =
       let fellBy = test.boulder.getWorldPosition().fY - test.boulderSpawnY
       testCheck(fellBy > 100.0,
         fmt"startup boulder fell only {fellBy:.1} units")
-    testCheck(gs.dirtDug >= 3,
-      fmt"player dug only {gs.dirtDug} dirt cells")
+    testCheck(gs.dirtDug >= 6,
+      fmt"player dug only {gs.dirtDug} sand blocks")
     testCheck(gs.collected >= 1,
       "player did not collect the corridor diamond")
     testCheck(gs.score >= gs.diamondScore,
@@ -376,7 +377,8 @@ proc runConfigChecks(): bool =
   if not checkInputBindings():
     return false
 
-  for section in ["Player", "Boulder", "Diamond", "Dirt", "Wall", "Exit",
+  for section in ["Player", "BoulderSmall", "Boulder", "BoulderBig",
+                  "Diamond", "Sand32", "Sand16", "Wall", "Exit",
                   "DustPuff", "GemSparkle", "AudioSource"]:
     let testObject = objectCreateFromConfig(section)
     if testObject == nil:
@@ -425,6 +427,13 @@ proc init(): orxSTATUS {.cdecl.} =
   if mainCamera == nil:
     echo "Could not fetch the main camera"
     return STATUS_FAILURE
+  if pushSection("MainCamera").isSuccess:
+    cameraHalfW = getFloat("FrustumWidth") * 0.5'f32
+    cameraHalfH = getFloat("FrustumHeight") * 0.5'f32
+    discard popSection()
+  if cameraHalfW == 0.0:
+    cameraHalfW = 640.0
+    cameraHalfH = 360.0
 
   if not ui.initUi():
     return STATUS_FAILURE

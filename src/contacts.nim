@@ -3,6 +3,7 @@
 ## ORX dispatches physics contact events while Box2D is stepping; bodies
 ## must not be destroyed from inside those callbacks, so contacts are only
 ## recorded here and drained later once per frame.
+import strutils
 import norx
 import game
 import world
@@ -54,14 +55,16 @@ proc unregisterContactHandler*(): orxSTATUS =
   removeHandler(EVENT_TYPE_PHYSICS, physicsEventHandler)
 
 proc kindOf(gameObject: ptr orxOBJECT): ObjKind =
-  case objectKind(gameObject)
-  of "Player": kPlayer
-  of "Boulder": kBoulder
-  of "Diamond": kDiamond
-  of "Dirt": kDirt
-  of "Wall": kWall
-  of "Exit": kExit
-  else: kOther
+  let name = objectKind(gameObject)
+  if name.startsWith("Sand"): kDirt
+  elif name.startsWith("Boulder"): kBoulder
+  else:
+    case name
+    of "Player": kPlayer
+    of "Diamond": kDiamond
+    of "Wall": kWall
+    of "Exit": kExit
+    else: kOther
 
 proc impactSpeed(gameObject: ptr orxOBJECT): float32 =
   let speed = gameObject.getSpeed()
@@ -80,9 +83,7 @@ proc processContact(contact: Contact) =
     pair = {firstKind, secondKind}
 
   if pair == {kPlayer, kDirt}:
-    when defined(debugContacts):
-      echo "DIG CONTACT player-dirt"
-    destroyDirt(if firstKind == kDirt: contact.first else: contact.second)
+    digSand(if firstKind == kDirt: contact.first else: contact.second)
 
   elif pair == {kPlayer, kDiamond}:
     collectGem(if firstKind == kDiamond: contact.first else: contact.second)
