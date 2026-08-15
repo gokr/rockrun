@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-16
+
+Animation wiring, tunnel routing and text size fixes.
+
+### Fixed
+
+- Player animation actually plays: ORX attaches animations through the
+  `AnimationSet` object property and an `AnimationList` of animation
+  sections, not an `AnimSet` property. Each animation (Idle/Run/Dig) is
+  now its own 24px strip with a Dig->Idle link.
+- Player visual size: 24px animation frames are rendered at object scale
+  1.25 (~30px hero); the physics box was re-derived to stay 26px.
+- Cave 2 now has a clearly visible tunnel from the start pocket through
+  the left shaft into the central hall.
+
+### Changed
+
+- HUD text enlarged (~40px glyphs) with re-tuned positions and a shorter
+  hint line that fits 1280px.
+
 ## [0.3.0] - 2026-08-16
 
 Creatures, readable retro font and an animated hero.

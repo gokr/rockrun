@@ -134,6 +134,9 @@ def level2():
     carve(g, 11, 11, 15, 11)
     carve(g, 33, 12, 38, 12)
     carve(g, 20, 8, 28, 9)
+    # connector from the start pocket to the left shaft
+    carve(g, 6, 3, 8, 3)
+    carve(g, 6, 4, 8, 4)
     # side shafts
     carve(g, 9, 4, 10, 20)
     carve(g, 38, 6, 39, 18)

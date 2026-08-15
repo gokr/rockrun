@@ -76,8 +76,11 @@ Also re-generate levels after changing `tools/genlevels.py`:
   downward input.
 - Text objects need `Graphic = @` and `Text = @` plus `Font = GameFont`;
   fonts live in data/font (added to the Texture storage group).
-- ORX animations: `[PlayerAnimSet]` lists `Animation = Name # frames # ...`
-  and the hero strip is 4 idle + 6 run + 3 dig frames at 24px.
+- ORX animations: the OBJECT key is `AnimationSet`, the set lists
+  `AnimationList = Idle # Run # Dig` with per-anim sections carrying their
+  own Texture/KeyDuration, and the hero strips are 24px frames rendered at
+  object scale 1.25 (physics box must stay ~26px via explicit part
+  TopLeft/BottomRight).
 - HUD lives in a second viewport; ORX draws viewports first-created-first,
   and HUD objects are Z-separated so the main camera never renders them.
 - ORX needs the ini named after the executable: keep `rockrun.ini` in sync

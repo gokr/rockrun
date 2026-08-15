@@ -8,6 +8,7 @@ Writes 64x64 RGBA PNGs to a target directory:
 Deterministic (seeded) so regeneration is reproducible.
 """
 import math
+import os
 import random
 
 from PIL import Image, ImageDraw, ImageFilter
@@ -234,6 +235,26 @@ def make_firefly(name, body_rgb, wing_rgb, seed):
     return img
 
 
+def make_hero_strips():
+    """Cuts the Kenney adventurer sheet (tools/kenney-characters.png,
+    9x3 grid of 24px tiles with 1px spacing) into three animation strips:
+    idle (4), run (6), hit/dig (3)."""
+    src = os.path.join(os.path.dirname(__file__), "kenney-characters.png")
+    sheet = Image.open(src).convert("RGBA")
+    plans = {
+        "idle": [0, 1, 2, 3],
+        "run": [4, 5, 6, 7, 8, 9],
+        "dig": [17, 18, 19],
+    }
+    for name, sel in plans.items():
+        out = Image.new("RGBA", (24 * len(sel), 24), (0, 0, 0, 0))
+        for n, i in enumerate(sel):
+            col, row = i % 9, i // 9
+            tile = sheet.crop((col * 25, row * 25, col * 25 + 24, row * 25 + 24))
+            out.paste(tile, (n * 24, 0), tile)
+        out.save(f"/home/gokr/git/rockrun/data/texture/{name}.png")
+
+
 if __name__ == "__main__":
     # All blobs fill ~94% of the canvas so that object scale maps physics
     # sphere radius directly to what you see (auto-sized parts).
@@ -246,4 +267,5 @@ if __name__ == "__main__":
     # (turns left).
     make_firefly("firefly", (90, 235, 225), (40, 190, 210), 51)
     make_firefly("butterfly", (225, 95, 235), (160, 60, 190), 77)
+    make_hero_strips()
     print("wrote textures")

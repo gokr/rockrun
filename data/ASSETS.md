@@ -27,8 +27,9 @@ Source: [Kenney Pixel Platformer](https://kenney.nl/assets/pixel-platformer),
 licensed under [Creative Commons CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 (full text in `texture/LICENSE-KENNEY-PIXEL-PLATFORMER.txt`).
 
-- `texture/hero.png` — 13-frame strip (4 idle, 6 run, 3 hit) cropped from
-  the adventurer character sheet
+- `texture/idle.png`, `texture/run.png`, `texture/dig.png` — animation
+  strips (4/6/3 frames) cut from the adventurer character sheet of
+  Kenney's Pixel Platformer; source sheet kept as `tools/kenney-characters.png`
 
 ## Fonts
 
