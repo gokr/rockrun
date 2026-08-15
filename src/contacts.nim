@@ -1,0 +1,130 @@
+## Physics contact handling for Rockrun.
+##
+## ORX dispatches physics contact events while Box2D is stepping; bodies
+## must not be destroyed from inside those callbacks, so contacts are only
+## recorded here and drained later once per frame.
+import norx
+import game
+import world
+import ui
+
+type
+  Contact = object
+    first: ptr orxOBJECT
+    second: ptr orxOBJECT
+    position: orxVECTOR
+
+  ObjKind = enum
+    kOther
+    kPlayer
+    kBoulder
+    kDiamond
+    kDirt
+    kWall
+    kExit
+
+var
+  pendingContacts: seq[Contact]
+
+proc physicsEventHandler(event: ptr orxEVENT): orxSTATUS {.cdecl.} =
+  ## Queues contact events without touching any bodies.
+  if event.eID != ord(PHYSICS_EVENT_CONTACT_ADD):
+    return STATUS_SUCCESS
+  when defined(debugContacts):
+    if cast[ptr orxOBJECT](event.hRecipient) != nil and
+        cast[ptr orxOBJECT](event.hSender) != nil:
+      echo "CONTACT_ADD ", objectKind(cast[ptr orxOBJECT](event.hRecipient)),
+           " vs ", objectKind(cast[ptr orxOBJECT](event.hSender))
+  let
+    recipient = cast[ptr orxOBJECT](event.hRecipient)
+    sender = cast[ptr orxOBJECT](event.hSender)
+  if recipient == nil or sender == nil:
+    return STATUS_SUCCESS
+  var contact = Contact(first: recipient, second: sender)
+  if event.pstPayload != nil:
+    contact.position =
+      cast[ptr orxPHYSICS_EVENT_PAYLOAD](event.pstPayload).vPosition
+  pendingContacts.add(contact)
+  result = STATUS_SUCCESS
+
+proc registerContactHandler*(): orxSTATUS =
+  addHandler(EVENT_TYPE_PHYSICS, physicsEventHandler)
+
+proc unregisterContactHandler*(): orxSTATUS =
+  removeHandler(EVENT_TYPE_PHYSICS, physicsEventHandler)
+
+proc kindOf(gameObject: ptr orxOBJECT): ObjKind =
+  case objectKind(gameObject)
+  of "Player": kPlayer
+  of "Boulder": kBoulder
+  of "Diamond": kDiamond
+  of "Dirt": kDirt
+  of "Wall": kWall
+  of "Exit": kExit
+  else: kOther
+
+proc impactSpeed(gameObject: ptr orxOBJECT): float32 =
+  let speed = gameObject.getSpeed()
+  result = abs(speed.fX) + abs(speed.fY)
+
+proc processContact(contact: Contact) =
+  if gs.phase != phPlaying:
+    return
+  if world.isDestroyed(contact.first) or world.isDestroyed(contact.second):
+    # Either body has meanwhile been destroyed (e.g. by digging); touches
+    # to it are stale and must be ignored.
+    return
+  let
+    firstKind = kindOf(contact.first)
+    secondKind = kindOf(contact.second)
+    pair = {firstKind, secondKind}
+
+  if pair == {kPlayer, kDirt}:
+    when defined(debugContacts):
+      echo "DIG CONTACT player-dirt"
+    destroyDirt(if firstKind == kDirt: contact.first else: contact.second)
+
+  elif pair == {kPlayer, kDiamond}:
+    collectGem(if firstKind == kDiamond: contact.first else: contact.second)
+
+  elif pair == {kPlayer, kExit}:
+    if gs.exitOpen:
+      gs.levelCompleted = true
+    else:
+      ui.showSubMessage("Need " & $gemsLeft() & " more diamonds", 1.5)
+
+  elif pair == {kBoulder, kPlayer}:
+    let boulder = if firstKind == kBoulder: contact.first
+                  else: contact.second
+    if boulder.getSpeed().fY > CrushYSpeed:
+      gs.deathReason = "Crushed by a boulder"
+      enterPhase(phDying)
+    elif impactSpeed(boulder) > ThudMinSpeed and
+        gs.worldClockTime - gs.lastThud >= ThudInterval:
+      gs.lastThud = gs.worldClockTime
+      spawnBurst("DustPuff", contact.position, 2)
+      discard boulder.addSound("LandSound")
+
+  elif pair == {kBoulder, kDirt} or pair == {kBoulder, kWall} or
+      pair == {kBoulder, kBoulder}:
+    let boulder = if firstKind == kBoulder: contact.first
+                  else: contact.second
+    if impactSpeed(boulder) > ThudMinSpeed and
+        gs.worldClockTime - gs.lastThud >= ThudInterval:
+      gs.lastThud = gs.worldClockTime
+      discard boulder.addSound("LandSound")
+
+  elif pair == {kDiamond, kDirt} or pair == {kDiamond, kWall} or
+      pair == {kDiamond, kBoulder} or pair == {kDiamond, kDiamond}:
+    let gem = if firstKind == kDiamond: contact.first
+              else: contact.second
+    if impactSpeed(gem) > ClinkMinSpeed and
+        gs.worldClockTime - gs.lastClink >= ClinkInterval:
+      gs.lastClink = gs.worldClockTime
+      discard gem.addSound("ClinkSound")
+
+proc processContacts*() =
+  ## Applies all queued contacts. Runs once per frame, after physics.
+  for contact in pendingContacts:
+    processContact(contact)
+  pendingContacts.setLen(0)
