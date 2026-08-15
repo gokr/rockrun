@@ -7,6 +7,7 @@ import strutils
 import norx
 import game
 import world
+import creatures
 import ui
 
 type
@@ -23,6 +24,7 @@ type
     kDirt
     kWall
     kExit
+    kCreature
 
 var
   pendingContacts: seq[Contact]
@@ -58,6 +60,7 @@ proc kindOf(gameObject: ptr orxOBJECT): ObjKind =
   let name = objectKind(gameObject)
   if name.startsWith("Sand"): kDirt
   elif name.startsWith("Boulder"): kBoulder
+  elif name == "Firefly" or name == "Butterfly": kCreature
   else:
     case name
     of "Player": kPlayer
@@ -105,6 +108,23 @@ proc processContact(contact: Contact) =
       gs.lastThud = gs.worldClockTime
       spawnBurst("DustPuff", contact.position, 2)
       discard boulder.addSound("LandSound")
+
+  elif pair == {kPlayer, kCreature}:
+    let creatureObj = if firstKind == kCreature: contact.first
+                      else: contact.second
+    gs.deathReason =
+      (if objectKind(creatureObj) == "Firefly": "Devoured by a firefly"
+       else: "Caught by a butterfly")
+    enterPhase(phDying)
+
+  elif pair == {kBoulder, kCreature}:
+    let
+      boulder = if firstKind == kBoulder: contact.first
+                else: contact.second
+      creatureObj = if firstKind == kCreature: contact.first
+                    else: contact.second
+    if boulder.getSpeed().fY > CrushYSpeed:
+      creatures.explodeCreature(creatures.findCreature(creatureObj))
 
   elif pair == {kBoulder, kDirt} or pair == {kBoulder, kWall} or
       pair == {kBoulder, kBoulder}:

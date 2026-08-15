@@ -20,6 +20,7 @@ import norx
 import game
 import world
 import contacts
+import creatures
 import movement
 import ui
 import screenshots
@@ -79,6 +80,8 @@ proc showLevelIntro() =
 
 proc reloadLevel() =
   if world.loadWorld(gs.levelIndex):
+    creatures.clearCreatures()
+    creatures.spawnPending()
     dyingHandled = false
     gs.shake = 0.0
     showLevelIntro()
@@ -242,6 +245,9 @@ proc runTestScript(deltaTime: float32) =
               fmt"the second cave did not load (levelIndex={gs.levelIndex})")
     testCheck(gs.phase in {phIntro, phPlaying},
               fmt"unexpected phase after completing cave: {gs.phase}")
+    if test.failures.len == 0:
+      # Cave 2 is loaded and its firefly/butterfly spawned: capture them.
+      discard screenshots.takeScreenshot()
     setEnginePaused(false)
     discard eventSendShort(EVENT_TYPE_SYSTEM, SYSTEM_EVENT_CLOSE.orxU32)
 
@@ -289,6 +295,7 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
       gs.deathReason = "Out of time"
       enterPhase(phDying)
     movement.updatePlayer(deltaTime)
+    creatures.updateCreatures(deltaTime)
     if not gs.exitOpen and gs.collected >= gs.needed:
       world.openExit()
       ui.showSubMessage("EXIT OPEN!", 2.0)
@@ -378,7 +385,7 @@ proc runConfigChecks(): bool =
     return false
 
   for section in ["Player", "BoulderSmall", "Boulder", "BoulderBig",
-                  "Diamond", "Sand32", "Sand16", "Wall", "Exit",
+                  "Diamond", "Sand32", "SandFine", "Wall", "Exit",
                   "DustPuff", "GemSparkle", "AudioSource"]:
     let testObject = objectCreateFromConfig(section)
     if testObject == nil:
@@ -453,6 +460,7 @@ proc init(): orxSTATUS {.cdecl.} =
   if not world.loadWorld(0):
     echo "Could not load the first level"
     return STATUS_FAILURE
+  creatures.spawnPending()
   showLevelIntro()
 
   if registerContactHandler().isFailure:
@@ -498,6 +506,7 @@ proc bootstrap(): orxSTATUS {.cdecl.} =
     if result.isFailure:
       return
     discard addStorage(TEXTURE_KZ_RESOURCE_GROUP, basePath / "texture", false)
+    discard addStorage(TEXTURE_KZ_RESOURCE_GROUP, basePath / "font", false)
     discard addStorage(SOUND_KZ_RESOURCE_GROUP, basePath / "sound", false)
     discard addStorage(SOUND_KZ_RESOURCE_GROUP, basePath / "music", false)
     return

@@ -1,9 +1,9 @@
-## Player movement and digging for Rockrun.
+## Player movement, digging and animation for Rockrun.
 ##
 ## The player is a dynamic physics body: movement is applied as an
 ## absolute velocity so the player can push boulders naturally through
-## physics, climb through dirt (by digging it away), and fall with
-## realistic gravity when nothing is held.
+## physics and climb through sand (by digging it away). Gravity is off
+## (classic Boulder Dash movement), so vertical motion is pure input.
 import options
 import math
 import norx
@@ -13,6 +13,8 @@ import world
 var
   movementOverride*: Option[tuple[x, y: float32]]
   ## When set (startup test), replaces live input.
+  currentAnim = ""
+  digAnimTimer: float32 = 0.0
 
 proc clampAxis(value: float32): float32 =
   ## Applies the dead zone to an analog stick axis.
@@ -55,8 +57,13 @@ proc boulderAhead(dx: float32): bool =
       return true
   result = false
 
+proc playAnim(animName: string) =
+  if player != nil and currentAnim != animName:
+    currentAnim = animName
+    discard player.setCurrentAnim(animName.cstring)
+
 proc updatePlayer*(deltaTime: float32) =
-  ## Applies movement, digging and push feedback for the current frame.
+  ## Applies movement, digging, animation and push feedback.
   if player == nil or gs.phase != phPlaying:
     return
 
@@ -64,15 +71,30 @@ proc updatePlayer*(deltaTime: float32) =
   let previousSpeed = player.getSpeed()
   var speed = previousSpeed
   speed.fX = dx * PlayerSpeed
-  # The player is anti-gravity (classic Boulder Dash movement): vertical
-  # position only changes through intentional input.
+  # Anti-gravity player: vertical position changes only through input.
   speed.fY = dy * PlayerSpeed
   discard player.setSpeed(speed)
   when defined(testForceMove):
     var force = newVector(dx * 9000.0, 0.0, 0.0)
     discard player.applyForce(addr force, nil)
 
+  let digBefore = dirts.len
   digAround(player.getWorldPosition(), dx, dy)
+
+  # Animation state machine: brief dig swing when digging, run while
+  # moving, idle otherwise.
+  if digAnimTimer > 0.0:
+    digAnimTimer -= deltaTime
+    if digAnimTimer <= 0.0 and dx == 0.0 and dy == 0.0:
+      playAnim("Idle")
+  if dirts.len < digBefore and digAnimTimer <= 0.0:
+    digAnimTimer = 0.24
+    playAnim("Dig")
+  elif digAnimTimer <= 0.0:
+    if dx != 0.0 or dy != 0.0:
+      playAnim("Run")
+    else:
+      playAnim("Idle")
 
   # Push feedback when squeezed against a boulder: we order the player to
   # move but physical velocity barely follows because a boulder is ahead.

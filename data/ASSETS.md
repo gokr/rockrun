@@ -18,9 +18,23 @@ Source: [Kenney Sokoban](https://kenney.nl/assets/sokoban), licensed under
 [Creative Commons CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 (full text in `texture/LICENSE-KENNEY-SOKOBAN.txt`).
 
-- `texture/player.png`
 - `texture/wall.png`
 - `texture/exit.png`
+
+### Kenney Pixel Platformer
+
+Source: [Kenney Pixel Platformer](https://kenney.nl/assets/pixel-platformer),
+licensed under [Creative Commons CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+(full text in `texture/LICENSE-KENNEY-PIXEL-PLATFORMER.txt`).
+
+- `texture/hero.png` — 13-frame strip (4 idle, 6 run, 3 hit) cropped from
+  the adventurer character sheet
+
+## Fonts
+
+- `font/pressstart2p.ttf` — Press Start 2P by Cody "CodeMan38" Boisclair,
+  licensed under the SIL Open Font License 1.1 (see `font/OFL.txt`),
+  sourced from the [google/fonts repository](https://github.com/google/fonts).
 
 ## Sound effects
 

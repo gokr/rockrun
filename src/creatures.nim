@@ -1,0 +1,149 @@
+## Fireflies and butterflies: classic Boulder Dash wall huggers.
+##
+## Fireflies keep the wall on their LEFT (prefer right turns, orbit
+## clockwise); butterflies keep it on their RIGHT (left turns). They move
+## smoothly between cell centers as small physics bodies and make their
+## turning decision only when they reach a cell center - the deterministic
+## grid behavior of the original, but physical on the way there.
+##
+## Crushing one with a falling boulder turns it into a burst of diamonds.
+import math
+import norx
+import game
+import world
+
+type
+  CreatureKind* = enum
+    ckFirefly
+    ckButterfly
+
+  Creature* = object
+    obj*: ptr orxOBJECT
+    kind*: CreatureKind
+    cellX*, cellY*: int
+    dirX*, dirY*: int
+    targetX*, targetY*: int
+    speed*: float32
+
+var
+  creatures*: seq[Creature]
+
+const
+  FireflySpeed* = 90.0'f32
+  ButterflySpeed* = 115.0'f32
+  ArrivalDistance = 6.0'f32
+
+proc blockedAt*(cx, cy: int): bool =
+  ## True when a cell stops a creature: outside, wall, or any sand.
+  if cx < 0 or cx >= worldW or cy < 0 or cy >= worldH:
+    return true
+  if world.walls[cy * worldW + cx]:
+    return true
+  let cell = world.sandCells[cy * worldW + cx]
+  if cell.refined:
+    for sub in cell.subs:
+      if sub != nil:
+        return true
+    result = false
+  else:
+    result = cell.big != nil
+
+proc turnLeft(dx, dy: int): tuple[x, y: int] = (dy, -dx)
+proc turnRight(dx, dy: int): tuple[x, y: int] = (-dy, dx)
+
+proc chooseDirection(creature: var Creature) =
+  ## Classic wall-hugging preference order at a cell center.
+  let (dx, dy) = (creature.dirX, creature.dirY)
+  var options: array[4, tuple[x, y: int]]
+  if creature.kind == ckFirefly:
+    options = [turnRight(dx, dy), (dx, dy), turnLeft(dx, dy), (-dx, -dy)]
+  else:
+    options = [turnLeft(dx, dy), (dx, dy), turnRight(dx, dy), (-dx, -dy)]
+  for option in options:
+    let nx = creature.cellX + option.x
+    let ny = creature.cellY + option.y
+    if not blockedAt(nx, ny):
+      creature.dirX = option.x
+      creature.dirY = option.y
+      creature.targetX = nx
+      creature.targetY = ny
+      return
+  # Fully enclosed: stay put.
+  creature.dirX = 0
+  creature.dirY = 0
+  creature.targetX = creature.cellX
+  creature.targetY = creature.cellY
+
+proc spawnCreature*(configName: string; cx, cy: int;
+                    kind: CreatureKind): ptr orxOBJECT =
+  ## Spawns a creature at a cell center, initially moving right.
+  result = objectCreateFromConfig(configName)
+  if result != nil:
+    discard result.setPosition(world.cellWorld(cx, cy))
+    discard result.addFX("SparkleFX")
+    creatures.add(Creature(obj: result, kind: kind, cellX: cx, cellY: cy,
+                           dirX: 1, dirY: 0, targetX: cx + 1, targetY: cy,
+                           speed: (if kind == ckFirefly: FireflySpeed
+                                   else: ButterflySpeed)))
+
+proc explodeCreature*(creature: Creature) =
+  ## A falling boulder crushed the creature: burst into nine diamonds.
+  if creature.obj == nil or world.isDestroyed(creature.obj):
+    return
+  let position = creature.obj.getWorldPosition()
+  world.spawnBurst("GemSparkle", position, 5)
+  discard creature.obj.addSound("ClinkSound")
+  for offset in world.SubOffsets:
+    let spot = newVector(position.fX + offset.x, position.fY + offset.y, 0.0)
+    let (cx, cy) = world.cellOf(spot)
+    var spawn = spot
+    if blockedAt(cx, cy):
+      # Never push gems inside static sand; pile them on the creature spot.
+      spawn = position
+    let gem = objectCreateFromConfig("Diamond")
+    if gem != nil:
+      discard gem.setPosition(spawn)
+      discard gem.addFX("SparkleFX")
+      world.gems.add(gem)
+  world.destroyObject(creature.obj)
+  gs.hudDirty = true
+
+proc findCreature*(gameObject: ptr orxOBJECT): Creature =
+  for creature in creatures:
+    if creature.obj == gameObject:
+      return creature
+  result = Creature(obj: nil)
+
+proc spawnPending*() =
+  ## Instantiates all creatures recorded by world level parsing.
+  for pending in world.pendingCreatures:
+    let kind = (if pending.config == "Firefly": ckFirefly else: ckButterfly)
+    discard spawnCreature(pending.config, pending.x, pending.y, kind)
+
+proc updateCreatures*(deltaTime: float32) =
+  ## Drives creature steering and smooth movement.
+  for creature in creatures.mitems:
+    if creature.obj == nil or world.isDestroyed(creature.obj):
+      continue
+    let position = creature.obj.getWorldPosition()
+    let target = world.cellWorld(creature.targetX, creature.targetY)
+    let dx = target.fX - position.fX
+    let dy = target.fY - position.fY
+    if abs(dx) + abs(dy) <= ArrivalDistance:
+      creature.cellX = creature.targetX
+      creature.cellY = creature.targetY
+      chooseDirection(creature)
+      let next = world.cellWorld(creature.targetX, creature.targetY)
+      let ndx = next.fX - position.fX
+      let ndy = next.fY - position.fY
+      let length = max(1.0'f32, hypot(ndx, ndy))
+      discard creature.obj.setSpeed(newVector(
+        ndx / length * creature.speed, ndy / length * creature.speed, 0.0))
+    else:
+      let length = max(1.0'f32, hypot(dx, dy))
+      discard creature.obj.setSpeed(newVector(
+        dx / length * creature.speed, dy / length * creature.speed, 0.0))
+
+proc clearCreatures*() =
+  ## Drops creature tracking before a world reload destroys the objects.
+  creatures.setLen(0)

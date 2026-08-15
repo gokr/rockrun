@@ -201,6 +201,39 @@ def make_dirt(seed):
     return base
 
 
+def make_firefly(name, body_rgb, wing_rgb, seed):
+    """Glowing bug sprite: winged critter that hugs walls."""
+    r = random.Random(seed)
+    size = SIZE
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    cx, cy = size / 2, size / 2
+
+    glow = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(glow).ellipse([6, 6, size - 6, size - 6], fill=70)
+    glow = glow.filter(ImageFilter.GaussianBlur(5))
+    glow_img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    glow_img.paste(Image.new("RGB", (size, size), body_rgb), (0, 0), glow)
+    img.paste(glow_img, (0, 0), glow)
+
+    d = ImageDraw.Draw(img)
+    # two wings
+    for sx in (-1, 1):
+        wpts = [(cx, cy - 2),
+                (cx + sx * 24, cy - 14),
+                (cx + sx * 22, cy + 2),
+                (cx, cy + 6)]
+        d.polygon(wpts, fill=wing_rgb + (150,), outline=wing_rgb)
+    # body
+    d.ellipse([cx - 8, cy - 8, cx + 8, cy + 8],
+              fill=body_rgb + (255,), outline=(30, 30, 50))
+    d.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=(255, 255, 255))
+    # eyes
+    d.ellipse([cx - 5, cy - 6, cx - 1, cy - 2], fill=(10, 10, 20))
+    d.ellipse([cx + 1, cy - 6, cx + 5, cy - 2], fill=(10, 10, 20))
+    img.save(f"/home/gokr/git/rockrun/data/texture/{name}.png")
+    return img
+
+
 if __name__ == "__main__":
     # All blobs fill ~94% of the canvas so that object scale maps physics
     # sphere radius directly to what you see (auto-sized parts).
@@ -209,4 +242,8 @@ if __name__ == "__main__":
     make_boulder("boulder_big", 0.94, 41)
     make_diamond(5)
     make_dirt(3)
+    # Fireflies: teal wall-hugger (turns right) and purple butterfly
+    # (turns left).
+    make_firefly("firefly", (90, 235, 225), (40, 190, 210), 51)
+    make_firefly("butterfly", (225, 95, 235), (160, 60, 190), 77)
     print("wrote textures")

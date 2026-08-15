@@ -26,22 +26,38 @@ type
     rows*: seq[string]
 
   SandCell* = object
-    ## One 32px cave cell either holding a big block or four refined
-    ## 16px blocks.
+    ## One 32px cave cell either holding a big block or nine refined
+    ## 10.67px blocks (3x3 subdivision).
     big*: ptr orxOBJECT
     refined*: bool
-    subs*: array[4, ptr orxOBJECT]
+    subs*: array[9, ptr orxOBJECT]
+    center*: orxVECTOR
 
 const
-  ## Sub-block center offsets inside a 32px cell.
-  SubOffsets: array[4, tuple[x, y: float32]] =
-    [(-8.0'f32, -8.0'f32), (8.0'f32, -8.0'f32),
-     (-8.0'f32, 8.0'f32), (8.0'f32, 8.0'f32)]
+  ## Sub-grid size per cell (3x3) and block size in pixels.
+  SubGrid* = 3
+  SubBlock* = CellSize / SubGrid.float32
+
+proc computeSubOffsets(): array[SubGrid * SubGrid, tuple[x, y: float32]]
+    {.compileTime.} =
+  ## Sub-block center offsets inside a 32px cell, row-major.
+  for i in 0 ..< SubGrid * SubGrid:
+    let col = i mod SubGrid
+    let row = i div SubGrid
+    result[i] = (
+      x: (-SubBlock * (SubGrid.float32 - 1.0'f32) * 0.5'f32) +
+         col.float32 * SubBlock,
+      y: (-SubBlock * (SubGrid.float32 - 1.0'f32) * 0.5'f32) +
+         row.float32 * SubBlock)
+
+const SubOffsets* = computeSubOffsets()
 
 var
   worldW*, worldH*: int
   worldMinX*, worldMaxX*, worldMinY*, worldMaxY*: float32
   sandCells*: seq[SandCell]
+  walls*: seq[bool]
+  pendingCreatures*: seq[tuple[config: string, x, y: int]]
   player*: ptr orxOBJECT
   exitObject*: ptr orxOBJECT
   boulders*: seq[ptr orxOBJECT]
@@ -109,7 +125,7 @@ proc removeTracked(gameObject: ptr orxOBJECT) =
     if index >= 0:
       tracking[].delete(index)
 
-proc destroyObject(gameObject: ptr orxOBJECT) =
+proc destroyObject*(gameObject: ptr orxOBJECT) =
   if gameObject == nil:
     return
   removeTracked(gameObject)
@@ -134,7 +150,7 @@ proc spawnBurst*(configName: string; position: orxVECTOR; count = 3) =
       discard puff.setPosition(position)
 
 proc destroySmallSand*(gameObject: ptr orxOBJECT) =
-  ## Digs out a 16px sand block: dust, sound and score.
+  ## Digs out a fine sand block: dust, sound and score.
   if gameObject == nil:
     return
   let position = gameObject.getWorldPosition()
@@ -143,7 +159,7 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT) =
   let (cx, cy) = cellOf(position)
   if cx >= 0 and cx < worldW and cy >= 0 and cy < worldH:
     var cell = addr sandCells[cellIndex(cx, cy)]
-    for i in 0 ..< 4:
+    for i in 0 ..< cell.subs.len:
       if cell.subs[i] == gameObject:
         cell.subs[i] = nil
   if player != nil and gs.worldClockTime - gs.lastDig >= 0.11'f32:
@@ -155,7 +171,7 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT) =
   gs.hudDirty = true
 
 proc refineSand*(gameObject: ptr orxOBJECT) =
-  ## Replaces a 32px sand block by four 16px blocks at the same spot.
+  ## Replaces a 32px sand block by nine fine blocks at the same spot.
   if gameObject == nil:
     return
   let (cx, cy) = cellOf(gameObject.getWorldPosition())
@@ -168,7 +184,7 @@ proc refineSand*(gameObject: ptr orxOBJECT) =
   destroyObject(cell.big)
   cell.big = nil
   for i, offset in SubOffsets:
-    let sub = objectCreateFromConfig("Sand16")
+    let sub = objectCreateFromConfig("SandFine")
     if sub != nil:
       discard sub.setPosition(
         newVector(center.fX + offset.x, center.fY + offset.y, 0.0))
@@ -177,38 +193,41 @@ proc refineSand*(gameObject: ptr orxOBJECT) =
   cell.refined = true
 
 proc digSand*(gameObject: ptr orxOBJECT) =
-  ## Contact-triggered digging: refine big blocks, destroy small ones.
+  ## Contact-triggered digging: refine big blocks, destroy fine ones.
   case objectKind(gameObject)
   of "Sand32": refineSand(gameObject)
-  of "Sand16": destroySmallSand(gameObject)
+  of "SandFine": destroySmallSand(gameObject)
   else: discard
 
 proc digAround*(origin: orxVECTOR; dirX, dirY: float32) =
   ## Digs/refines sand immediately ahead of the player's movement.
-  ## Small 16px blocks in the dig path are removed; 32px blocks swapped.
-  for cell in sandCells.mitems:
-    if cell.refined:
-      let live = cell.subs
-      for sub in live:
-        if sub == nil:
-          continue
-        let position = sub.getWorldPosition()
-        let dx = position.fX - origin.fX
-        let dy = position.fY - origin.fY
-        let horizontal = dirX != 0.0 and dx * dirX > 0.0 and
-                         abs(dx) < 30.0 and abs(dy) < 24.0
-        let vertical = dirY != 0.0 and dy * dirY > 0.0 and
-                       abs(dx) < 24.0 and abs(dy) < 30.0
-        if horizontal or vertical:
-          destroySmallSand(sub)
-    elif cell.big != nil:
-      let position = cell.big.getWorldPosition()
-      let dx = position.fX - origin.fX
-      let dy = position.fY - origin.fY
-      let near = (dirX != 0.0 and abs(dx) < 34.0 and abs(dy) < 30.0) or
-                 (dirY != 0.0 and abs(dx) < 30.0 and abs(dy) < 34.0)
-      if near:
-        refineSand(cell.big)
+  ## Fine 10.67px blocks in the dig path are removed; 32px blocks swapped.
+  ## Only the cells near the player are considered (windowed for speed);
+  ## static cell centers are precomputed at build time.
+  let (playerCellX, playerCellY) = cellOf(origin)
+  for cy in max(0, playerCellY - 2) .. min(worldH - 1, playerCellY + 2):
+    for cx in max(0, playerCellX - 2) .. min(worldW - 1, playerCellX + 2):
+      var cell = addr sandCells[cellIndex(cx, cy)]
+      if cell.refined:
+        for i, sub in cell.subs:
+          if sub == nil:
+            continue
+          let
+            dx = cell.center.fX + SubOffsets[i].x - origin.fX
+            dy = cell.center.fY + SubOffsets[i].y - origin.fY
+          let horizontal = dirX != 0.0 and dx * dirX > 0.0 and
+                           abs(dx) < 33.0 and abs(dy) < 28.0
+          let vertical = dirY != 0.0 and dy * dirY > 0.0 and
+                         abs(dx) < 28.0 and abs(dy) < 33.0
+          if horizontal or vertical:
+            destroySmallSand(sub)
+      elif cell.big != nil:
+        let dx = cell.center.fX - origin.fX
+        let dy = cell.center.fY - origin.fY
+        let near = (dirX != 0.0 and abs(dx) < 36.0 and abs(dy) < 32.0) or
+                   (dirY != 0.0 and abs(dx) < 32.0 and abs(dy) < 36.0)
+        if near:
+          refineSand(cell.big)
 
 proc collectGem*(gem: ptr orxOBJECT) =
   ## Picks up a diamond: score, sparkle, and exit bookkeeping.
@@ -253,6 +272,8 @@ proc clearWorld*() =
   gems.setLen(0)
   dirts.setLen(0)
   sandCells.setLen(0)
+  walls.setLen(0)
+  pendingCreatures.setLen(0)
   destroyObject(exitObject)
   exitObject = nil
   destroyObject(player)
@@ -268,6 +289,7 @@ proc buildWorld(level: LevelDef): bool =
   worldMinY = -worldH.float32 * CellSize * 0.5'f32
   worldMaxY = -worldMinY
   sandCells = newSeq[SandCell](worldW * worldH)
+  walls = newSeq[bool](worldW * worldH)
 
   var playerCount, exitCount = 0
   for y, row in level.rows:
@@ -275,6 +297,7 @@ proc buildWorld(level: LevelDef): bool =
       let position = cellWorld(x, y)
       case symbol
       of '#':
+        walls[cellIndex(x, y)] = true
         let wall = objectCreateFromConfig("Wall")
         if wall == nil or wall.setPosition(position).isFailure:
           echo "Could not create a wall at ", x, ",", y
@@ -286,6 +309,7 @@ proc buildWorld(level: LevelDef): bool =
           return false
         dirts.add(sand)
         sandCells[cellIndex(x, y)].big = sand
+        sandCells[cellIndex(x, y)].center = position
       of 'o', 'O', 'Q':
         let configName =
           (if symbol == 'o': "BoulderSmall"
@@ -309,6 +333,9 @@ proc buildWorld(level: LevelDef): bool =
           echo "Could not create the exit"
           return false
         inc exitCount
+      of 'f', 'b':
+        pendingCreatures.add((config: (if symbol == 'f': "Firefly"
+                                       else: "Butterfly"), x: x, y: y))
       of '@':
         playerSpawnX = x
         playerSpawnY = y
@@ -366,7 +393,7 @@ proc validateLevels*(): bool =
         of '@': inc players
         of 'E': inc exits
         of 'D': inc gemCount
-        of ' ', '#', '.', 'o', 'O', 'Q': discard
+        of ' ', '#', '.', 'o', 'O', 'Q', 'f', 'b': discard
         else:
           echo "Startup check failed: unknown symbol '", symbol,
                "' in level ", i + 1

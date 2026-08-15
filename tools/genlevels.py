@@ -130,6 +130,10 @@ def level2():
     for x in (20, 24, 28):
         for y in (13, 16):
             g[y][x] = DIRT
+    # entry tunnels into the hall so it's reachable from the shafts
+    carve(g, 11, 11, 15, 11)
+    carve(g, 33, 12, 38, 12)
+    carve(g, 20, 8, 28, 9)
     # side shafts
     carve(g, 9, 4, 10, 20)
     carve(g, 38, 6, 39, 18)
@@ -139,6 +143,10 @@ def level2():
     # exit grotto bottom-left
     carve(g, 4, h - 5, 8, h - 4)
     g[ey][ex] = EXIT
+    # wall-hugging creatures: firefly in the left shaft, butterfly in the
+    # right one
+    g[12][9] = 'f'
+    g[16][39] = 'b'
     bands = [(17, 9, 31, 9), (11, 4, 15, 8), (33, 4, 37, 8), (40, 6, 45, 12),
              (18, 17, 30, 17), (12, 18, 24, 18), (29, 20, 43, 20), (2, 6, 8, 12)]
     placed = scatter(g, rng, w, h, BOULDER, 24, reserved, bands)
@@ -175,6 +183,9 @@ def level3():
     g[h - 4][w // 2 - 2] = BOULDER
     g[h - 4][w // 2 + 2] = BOULDER
     reserved |= {(w // 2 - 2, h - 4), (w // 2 + 2, h - 4)}
+    # creatures: firefly in the upper vault, butterfly in the lower mine
+    g[14][33] = 'f'
+    g[21][24] = 'b'
     bands = [(3, 4, 19, 10), (28, 6, 44, 7), (7, 13, 19, 13), (28, 13, 41, 13),
              (9, 20, 39, 20), (21, 14, 26, 14), (2, 16, 17, 19)]
     placed = scatter(g, rng, w, h, BOULDER, 30, reserved, bands)
