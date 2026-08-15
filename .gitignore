@@ -1,0 +1,10 @@
+# Binaries and build artifacts
+/rockrun
+/rockrun-test
+*.log
+
+# Test artifacts
+/screenshots/
+
+# OS/editor noise
+.DS_Store
