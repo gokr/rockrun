@@ -34,7 +34,6 @@ type
     phIntro
     phPlaying
     phPaused
-    phDying
     phComplete
     phGameOver
     phAllComplete
@@ -45,7 +44,6 @@ type
     playerCount*: int
     maxPlayers*: int
     score*: int
-    lives*: int
     livesStart*: int
     levelIndex*: int
     levelCount*: int
@@ -60,7 +58,7 @@ type
     gemTotal*: int
     exitOpen*: bool
     dirtDug*: int
-    deathReason*: string
+    timeExpired*: bool ## clock hit zero; alive heroes die once
     lastThud*: float32
     lastClink*: float32
     lastPush*: float32
@@ -77,9 +75,9 @@ proc resetRun*() =
   gs.score = 0
   gs.levelIndex = 0
   gs.dirtDug = 0
-  gs.deathReason = ""
   gs.shake = 0.0
   gs.levelCompleted = false
+  gs.timeExpired = false
   gs.worldClockTime = 0.0
 
 proc enterPhase*(phase: Phase) =
@@ -87,7 +85,6 @@ proc enterPhase*(phase: Phase) =
   gs.phase = phase
   case phase
   of phIntro: gs.phaseTimer = IntroTime
-  of phDying: gs.phaseTimer = DyingTime
   of phComplete: gs.phaseTimer = CompleteTime
   else: gs.phaseTimer = 0.0
   gs.hudDirty = true

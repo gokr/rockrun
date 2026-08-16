@@ -110,11 +110,13 @@ proc processContact(contact: Contact) =
       ui.showSubMessage("Need " & $gemsLeft() & " more diamonds", 1.5)
 
   elif pair == {kBoulder, kPlayer}:
-    let boulder = if firstKind == kBoulder: contact.first
-                  else: contact.second
+    let
+      boulder = if firstKind == kBoulder: contact.first
+                else: contact.second
+      heroObj = if firstKind == kPlayer: contact.first
+                else: contact.second
     if boulder.getSpeed().fY > CrushYSpeed:
-      gs.deathReason = "Crushed by a boulder"
-      enterPhase(phDying)
+      world.killPlayer(world.playerOf(heroObj), "Crushed by a boulder")
     elif impactSpeed(boulder) > ThudMinSpeed and
         gs.worldClockTime - gs.lastThud >= ThudInterval:
       gs.lastThud = gs.worldClockTime
@@ -122,12 +124,14 @@ proc processContact(contact: Contact) =
       discard boulder.addSound("LandSound")
 
   elif pair == {kPlayer, kCreature}:
-    let creatureObj = if firstKind == kCreature: contact.first
-                      else: contact.second
-    gs.deathReason =
+    let
+      creatureObj = if firstKind == kCreature: contact.first
+                    else: contact.second
+      heroObj = if firstKind == kPlayer: contact.first
+                else: contact.second
+    world.killPlayer(world.playerOf(heroObj),
       (if objectKind(creatureObj) == "Firefly": "Devoured by a firefly"
-       else: "Caught by a butterfly")
-    enterPhase(phDying)
+       else: "Caught by a butterfly"))
 
   elif pair == {kBoulder, kCreature}:
     let

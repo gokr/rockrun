@@ -2,13 +2,14 @@
 import strformat
 import norx
 import game
+import world
 
 var
   scoreObject: ptr orxOBJECT
   diamondsObject: ptr orxOBJECT
   timeObject: ptr orxOBJECT
-  livesObject: ptr orxOBJECT
   levelObject: ptr orxOBJECT
+  playerObjects: array[4, ptr orxOBJECT]
   messageObject: ptr orxOBJECT
   subMessageObject: ptr orxOBJECT
   messageTimer, subMessageTimer: float32
@@ -23,13 +24,17 @@ proc initUi*(): bool =
   scoreObject = objectCreateFromConfig("HudScore")
   diamondsObject = objectCreateFromConfig("HudDiamonds")
   timeObject = objectCreateFromConfig("HudTime")
-  livesObject = objectCreateFromConfig("HudLives")
   levelObject = objectCreateFromConfig("HudLevel")
   discard objectCreateFromConfig("HudHint")
+  for i in 0 ..< playerObjects.len:
+    playerObjects[i] = objectCreateFromConfig("HudPlayer" & $(i + 1))
+    if playerObjects[i] == nil:
+      echo "Could not create the player HUD line"
+      return false
   messageObject = objectCreateFromConfig("LevelMessage")
   subMessageObject = objectCreateFromConfig("SubMessage")
   if scoreObject == nil or diamondsObject == nil or timeObject == nil or
-      livesObject == nil or levelObject == nil or messageObject == nil or
+      levelObject == nil or messageObject == nil or
       subMessageObject == nil:
     echo "Could not create the HUD"
     return false
@@ -37,8 +42,11 @@ proc initUi*(): bool =
     (scoreObject, 20.0'f32, 18.0'f32),
     (diamondsObject, 420.0'f32, 18.0'f32),
     (timeObject, 760.0'f32, 18.0'f32),
-    (livesObject, 1050.0'f32, 18.0'f32),
     (levelObject, 20.0'f32, 84.0'f32),
+    (playerObjects[0], 420.0'f32, 84.0'f32),
+    (playerObjects[1], 590.0'f32, 84.0'f32),
+    (playerObjects[2], 760.0'f32, 84.0'f32),
+    (playerObjects[3], 930.0'f32, 84.0'f32),
     (messageObject, 640.0'f32, 300.0'f32),
     (subMessageObject, 640.0'f32, 400.0'f32)
   ]
@@ -95,6 +103,17 @@ proc updateUi*(deltaTime: float32) =
   discard diamondsObject.setTextString(
     &"GEMS {gs.collected}/{gs.needed}")
   discard timeObject.setTextString(&"TIME {shownSeconds}")
-  discard livesObject.setTextString(&"LIVES {gs.lives}")
   discard levelObject.setTextString(
     &"CAVE {gs.levelIndex + 1}: {gs.levelName}")
+  for i in 0 ..< playerObjects.len:
+    let obj = playerObjects[i]
+    if i < gs.playerCount and i < world.players.len:
+      discard obj.enable(true)
+      let hero = world.players[i]
+      let status =
+        if hero.down: "OUT"
+        elif hero.respawnTimer > 0.0: "!"
+        else: $hero.lives
+      discard obj.setTextString(&"P{i + 1} {status}")
+    else:
+      discard obj.enable(false)

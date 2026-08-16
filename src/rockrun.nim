@@ -14,6 +14,7 @@ import os
 import math
 import strformat
 import strutils
+import sequtils
 import options
 
 import norx
@@ -96,7 +97,6 @@ var
   cameraHalfW, cameraHalfH: float32
   coreClock: ptr orxCLOCK
   audioObject: ptr orxOBJECT
-  dyingHandled = false
   startupFrames: int
   initializationSucceeded = false
   executionFailed = false
@@ -155,19 +155,6 @@ proc setEnginePaused(paused: bool) =
   discard setModifier(coreClock, CLOCK_MODIFIER_MULTIPLY,
                       (if paused: 0.0 else: 1.0).orxFLOAT)
 
-proc startDying() =
-  ## Applies the one-time effects of losing a life.
-  dyingHandled = true
-  dec gs.lives
-  gs.shake = 9.0
-  let hero = world.playerObj()
-  if hero != nil:
-    discard hero.addSound("LoseSound")
-    discard hero.addFX("HitFlash")
-  ui.showMessage(gs.deathReason.toUpperAscii(), 1.4)
-  ui.showSubMessage(&"LIVES {gs.lives}", 1.4)
-  gs.hudDirty = true
-
 proc showLevelIntro() =
   ui.showMessage(&"CAVE {gs.levelIndex + 1} - {gs.levelName}", IntroTime)
   ui.showSubMessage(&"Collect {gs.needed} diamonds", IntroTime)
@@ -183,13 +170,11 @@ proc reloadLevel() =
       test.creatureSpawns.setLen(0)
       for creature in creatures.creatures:
         test.creatureSpawns.add(creature.obj.getWorldPosition())
-    dyingHandled = false
     gs.shake = 0.0
     showLevelIntro()
 
 proc restartRun() =
   resetRun()
-  gs.lives = gs.livesStart
   reloadLevel()
 
 proc completeLevel() =
@@ -381,26 +366,29 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
       enterPhase(phPlaying)
   of phPlaying:
     gs.timeLeft = max(0.0'f32, gs.timeLeft - deltaTime)
-    if gs.timeLeft <= 0.0:
-      gs.deathReason = "Out of time"
-      enterPhase(phDying)
+    if gs.timeLeft <= 0.0 and not gs.timeExpired:
+      # The clock ran out: every alive hero dies once; respawns then
+      # continue in the mined cave.
+      gs.timeExpired = true
+      for hero in world.players:
+        world.killPlayer(hero.index, "Out of time")
     for hero in world.players.mitems:
       movement.updatePlayer(hero, deltaTime)
+      if hero.respawnTimer > 0.0:
+        hero.respawnTimer = max(0.0'f32, hero.respawnTimer - deltaTime)
+        if hero.respawnTimer <= 0.0:
+          world.respawnPlayer(hero.index)
+      if hero.invulnTimer > 0.0:
+        hero.invulnTimer = max(0.0'f32, hero.invulnTimer - deltaTime)
+    if world.players.len > 0 and world.players.allIt(it.down):
+      ui.showMessage("GAME OVER", 0.0)
+      ui.showSubMessage(
+        &"Final score: {gs.score} - press R / Y to retry", 0.0)
+      enterPhase(phGameOver)
     creatures.updateCreatures(deltaTime)
     if not gs.exitOpen and gs.collected >= gs.needed:
       world.openExit()
       ui.showSubMessage("EXIT OPEN!", 2.0)
-  of phDying:
-    if not dyingHandled:
-      startDying()
-    gs.phaseTimer -= deltaTime
-    if gs.phaseTimer <= 0.0:
-      if gs.lives > 0:
-        reloadLevel()
-      else:
-        ui.showMessage("GAME OVER", 0.0)
-        ui.showSubMessage(&"Final score: {gs.score} - press R / Y to retry", 0.0)
-        enterPhase(phGameOver)
   of phComplete:
     gs.phaseTimer -= deltaTime
     if gs.phaseTimer <= 0.0:
@@ -575,7 +563,6 @@ proc init(): orxSTATUS {.cdecl.} =
     return STATUS_FAILURE
 
   resetRun()
-  gs.lives = gs.livesStart
   if not world.loadWorld(0):
     echo "Could not load the first level"
     return STATUS_FAILURE

@@ -210,6 +210,45 @@ proc spawnBurst*(configName: string; position: orxVECTOR; count = 3) =
     if puff != nil:
       discard puff.setPosition(position)
 
+proc killPlayer*(index: int; reason: string) =
+  ## Applies a death to one hero: loses a life, respawns at the spawn
+  ## cell after a short delay with invulnerability; at zero lives the
+  ## hero is out of the run (spectating).
+  if index < 0 or index >= players.len:
+    return
+  var hero = addr players[index]
+  if hero.obj == nil or hero.down or hero.respawnTimer > 0.0 or
+      hero.invulnTimer > 0.0:
+    return
+  dec hero.lives
+  hero.deathReason = reason
+  gs.shake = 9.0
+  gs.hudDirty = true
+  if hero.lives > 0:
+    hero.respawnTimer = DyingTime
+    hero.invulnTimer = InvulnTime
+    discard hero.obj.addSound("LoseSound")
+    discard hero.obj.addFX("HitFlash")
+  else:
+    hero.down = true
+    discard hero.obj.addSound("LoseSound")
+    destroyObject(hero.obj)
+    hero.obj = nil
+
+proc respawnPlayer*(index: int) =
+  ## Teleports a hero back to its spawn cell (invulnerability was granted
+  ## when the death happened).
+  if index < 0 or index >= players.len:
+    return
+  let hero = addr players[index]
+  if hero.obj == nil or hero.down:
+    return
+  hero.respawnTimer = 0.0
+  let position = cellWorld(hero.spawnX, hero.spawnY)
+  discard hero.obj.setWorldPosition(
+    newVector(position.fX, position.fY, PlayerZ))
+  spawnBurst("GemSparkle", position, 3)
+
 proc destroySmallSand*(gameObject: ptr orxOBJECT;
                        digger: ptr orxOBJECT = nil) =
   ## Digs out a fine sand block: dust, sound and score. The dig sound is
