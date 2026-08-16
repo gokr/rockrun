@@ -91,14 +91,15 @@ proc killHero(heroObj: ptr orxOBJECT; reason: string) =
 
 proc crushMomentum(boulder, other: ptr orxOBJECT;
                    normal: orxVECTOR): float32 =
-  ## The boulder's momentum closing in on `other` along the contact
-  ## normal. The normal is re-oriented from the other body's center
-  ## toward the boulder's center, so the signed approach
-  ## (v_boulder - v_other) . n is positive only when the boulder is
-  ## genuinely moving toward the other body: a player pushing or ramming
-  ## a boulder yields a negative approach and can never crush, while any
-  ## fall or roll onto the body does. Grazing contacts (normal sideways
-  ## to the motion) project to ~0.
+  ## Momentum of a boulder genuinely hitting `other`. The normal is
+  ## re-oriented from the other body's center toward the boulder's
+  ## center; a crush requires (1) the boulder's OWN velocity to point
+  ## toward the other body (v_b . n < 0) and (2) the closing speed
+  ## (v_other - v_b) . n to be positive - so the player pushing or
+  ## ramming a boulder (the boulder isn't moving toward them) can never
+  ## trigger a crush, a player outrunning a falling boulder is safe,
+  ## but any boulder genuinely coming at the body - fall, roll or short
+  ## head-drop - crushes. Grazing contacts project to ~0.
   var n = normal
   let boulderPos = boulder.getWorldPosition()
   let otherPos = other.getWorldPosition()
@@ -108,9 +109,14 @@ proc crushMomentum(boulder, other: ptr orxOBJECT;
     n.fY = -n.fY
   let bspeed = boulder.getSpeed()
   let ospeed = other.getSpeed()
-  let approach = (bspeed.fX - ospeed.fX) * n.fX +
-                 (bspeed.fY - ospeed.fY) * n.fY
-  result = if approach > 0.0: boulder.getMass() * approach else: 0.0
+  let boulderToward = bspeed.fX * n.fX + bspeed.fY * n.fY
+  if boulderToward >= 0.0:
+    return 0.0
+  let closing = (ospeed.fX - bspeed.fX) * n.fX +
+                (ospeed.fY - bspeed.fY) * n.fY
+  if closing <= 0.0:
+    return 0.0
+  result = boulder.getMass() * closing
 
 proc processContact(contact: Contact) =
   if gs.phase != phPlaying:

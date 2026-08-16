@@ -62,11 +62,12 @@ Local co-op multiplayer.
 - Boulder crush is now momentum-based (mass x fall speed) instead of
   plain speed: a huge boulder crushes from a small drop, a pebble needs
   a long fall - size now matters for "brutal" rocks.
-- Crush impact: signed approach momentum along the contact normal
-  (normal re-oriented from the other body toward the boulder), so only
-  a boulder genuinely moving toward you can crush - pushing or ramming
-  from any side is always safe, even short head-drops kill, and
-  creatures explode the same way (rolling boulders now pop them too).
+- Crush impact: requires the boulder's OWN velocity to point toward
+  the body (v_b.n < 0) plus a positive closing speed - a plain signed
+  approach couldn't tell who was moving, so pushing down onto a
+  resting boulder killed. Pushing/ramming from any side is now always
+  safe, short head-drops kill, grazing stays harmless, and outrunning
+  a falling boulder is possible.
 - Boulder density 5 -> 12: the normal boulder outweighs the player
   (~1.9x), so pebbles stay pushable but medium rocks can't be lifted
   and big/huge ones are effectively immovable.
