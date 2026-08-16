@@ -251,16 +251,18 @@ proc spawnBurst*(configName: string; position: orxVECTOR; count = 3) =
     if puff != nil:
       discard puff.setPosition(position)
 
-proc killPlayer*(index: int; reason: string) =
+proc killPlayer*(index: int; reason: string): bool =
   ## Applies a death to one hero: loses a life, respawns at the spawn
   ## cell after a short delay with invulnerability; at zero lives the
-  ## hero is out of the run (spectating).
+  ## hero is out of the run (spectating). Returns true when the death
+  ## was actually applied (false while invulnerable or already dying).
   if index < 0 or index >= players.len:
-    return
+    return false
   var hero = addr players[index]
   if hero.obj == nil or hero.down or hero.respawnTimer > 0.0 or
       hero.invulnTimer > 0.0:
-    return
+    return false
+  result = true
   dec hero.lives
   hero.deathReason = reason
   gs.runLives[index] = hero.lives

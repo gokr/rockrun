@@ -19,6 +19,8 @@ const
   CompleteTime* = 2.2'f32
   ## Respawn invulnerability window in seconds.
   InvulnTime* = 2.5'f32
+  ## Red viewport flash duration after a death.
+  DeathFlashTime* = 0.25'f32
   ## Camera smoothing rate for the exponentially damped follow.
   CameraLerpRate* = 7.0'f32
   ## Slower damping for frustum zoom changes (calmer than the follow).
@@ -74,6 +76,7 @@ type
     lastSink*: float32
     worldClockTime*: float32
     shake*: float32
+    deathFlash*: float32 ## red viewport flash remaining after a death
     hudDirty*: bool
     levelCompleted*: bool ## set by a contact with an open exit
 

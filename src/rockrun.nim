@@ -433,7 +433,7 @@ proc runTestScript(deltaTime: float32) =
         discard world.players[action.player].obj.setWorldPosition(
           world.cellWorld(action.cx, action.cy))
     of taKillPlayer:
-      world.killPlayer(action.player, "Test crush")
+      discard world.killPlayer(action.player, "Test crush")
     of taCheckRespawn:
       if action.player < world.players.len:
         let hero = world.players[action.player]
@@ -489,6 +489,28 @@ proc runTestScript(deltaTime: float32) =
           position.fX - test.creatureLastPos[i].fX,
           position.fY - test.creatureLastPos[i].fY)
       test.creatureLastPos[i] = position
+
+var
+  viewportFlashActive = false
+
+proc updateDeathFlash(deltaTime: float32) =
+  ## Tints the viewport background red while `gs.deathFlash` counts down,
+  ## then restores the cave background.
+  if gs.deathFlash > 0.0:
+    gs.deathFlash = max(0.0'f32, gs.deathFlash - deltaTime)
+    var
+      flashRGB = newVector(190.0, 30.0, 30.0)
+      flashColor: orxCOLOR
+    discard setColor(addr flashColor, addr flashRGB, 1.0)
+    discard setBackgroundColor(mainViewport, addr flashColor)
+    viewportFlashActive = true
+  elif viewportFlashActive:
+    var
+      caveRGB = newVector(9.0, 7.0, 12.0)
+      caveColor: orxCOLOR
+    discard setColor(addr caveColor, addr caveRGB, 1.0)
+    discard setBackgroundColor(mainViewport, addr caveColor)
+    viewportFlashActive = false
 
 proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
   if isActive("Quit"):
@@ -546,12 +568,19 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
       # continue in the mined cave.
       gs.timeExpired = true
       for hero in world.players:
-        world.killPlayer(hero.index, "Out of time")
+        discard world.killPlayer(hero.index, "Out of time")
+      gs.deathFlash = DeathFlashTime
+      ui.showMessage("OUT OF TIME", 1.6)
     for hero in world.players.mitems:
       movement.updatePlayer(hero, deltaTime)
       if hero.respawnTimer > 0.0:
         hero.respawnTimer = max(0.0'f32, hero.respawnTimer - deltaTime)
+        # Dead blink: flashing the corpse on and off at ~10Hz makes the
+        # death readable at a glance.
+        let blinkOn = int(hero.respawnTimer * 20.0) mod 2 == 0
+        discard hero.obj.enable(blinkOn)
         if hero.respawnTimer <= 0.0:
+          discard hero.obj.enable(true)
           world.respawnPlayer(hero.index)
       if hero.invulnTimer > 0.0:
         hero.invulnTimer = max(0.0'f32, hero.invulnTimer - deltaTime)
@@ -581,6 +610,7 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
   if gs.phase == phPlaying and gs.levelCompleted:
     completeLevel()
 
+  updateDeathFlash(deltaTime)
   gs.worldClockTime += deltaTime
   updateCamera(deltaTime)
   ui.updateUi(deltaTime)

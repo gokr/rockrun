@@ -34,6 +34,13 @@ Local co-op multiplayer.
   digging into a hidden firefly gives you a reaction window instead of
   an instant death - classic BD behavior.
 
+### Changed
+
+- Clearer death sequence: the viewport flashes red, a center message
+  names the fallen player and cause ("P2 - CRUSHED BY A BOULDER") with
+  their remaining lives, and the corpse blinks at ~10Hz until it
+  respawns.
+
 ## [1.0.0] - 2026-08-16
 
 First stable release.

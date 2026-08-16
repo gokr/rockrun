@@ -4,6 +4,7 @@
 ## must not be destroyed from inside those callbacks, so contacts are only
 ## recorded here and drained later once per frame.
 import strutils
+import strformat
 import norx
 import game
 import world
@@ -73,6 +74,19 @@ proc impactSpeed(gameObject: ptr orxOBJECT): float32 =
   let speed = gameObject.getSpeed()
   result = abs(speed.fX) + abs(speed.fY)
 
+proc killHero(heroObj: ptr orxOBJECT; reason: string) =
+  ## Applies a death to the hero touching `heroObj` and plays the death
+  ## feedback: red viewport flash, center message with the cause and the
+  ## remaining lives.
+  let index = world.playerOf(heroObj)
+  if world.killPlayer(index, reason):
+    gs.deathFlash = DeathFlashTime
+    ui.showMessage((&"P{index + 1} {reason}").toUpperAscii(), 1.6)
+    if index < world.players.len:
+      let hero = world.players[index]
+      ui.showSubMessage(
+        (if hero.down: "OUT OF LIVES" else: &"LIVES {hero.lives}"), 1.6)
+
 proc processContact(contact: Contact) =
   if gs.phase != phPlaying:
     return
@@ -116,7 +130,7 @@ proc processContact(contact: Contact) =
       heroObj = if firstKind == kPlayer: contact.first
                 else: contact.second
     if boulder.getSpeed().fY > CrushYSpeed:
-      world.killPlayer(world.playerOf(heroObj), "Crushed by a boulder")
+      killHero(heroObj, "Crushed by a boulder")
     elif impactSpeed(boulder) > ThudMinSpeed and
         gs.worldClockTime - gs.lastThud >= ThudInterval:
       gs.lastThud = gs.worldClockTime
@@ -132,7 +146,7 @@ proc processContact(contact: Contact) =
     if not creatures.isDazed(creatureObj):
       # Dazed creatures (just dug out of their hiding wall) give the
       # player a reaction beat instead of killing instantly.
-      world.killPlayer(world.playerOf(heroObj),
+      killHero(heroObj,
         (if objectKind(creatureObj) == "Firefly": "Devoured by a firefly"
          else: "Caught by a butterfly"))
 
