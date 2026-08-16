@@ -26,6 +26,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   LIVES counter.
 - Creatures re-steer when wedged (stuck detection).
 
+### Fixed
+
+- Heroes 2-4 were invisible to the contact rules (`kindOf` matched only
+  the literal `Player` name): P2+ could not collect diamonds, finish the
+  cave, or be crushed, and got no contact-digging fallback. All hero
+  configs are now recognized as players.
+- `Confirm` was bound to `KEY_RETURN`, a key name ORX does not have
+  (it is `KEY_ENTER`) - the lobby could never be started with the
+  keyboard. The startup binding checks now cover it.
+
+### Changed
+
+- Heroes collide with each other again (`PlayerPart CheckMask 0xFFFF`).
+- World gravity raised 1150 -> 1400 (boulders and gems fall faster).
+
 ## [0.3.2] - 2026-08-16
 
 HUD rendering fix, finer sand and tighter hero.

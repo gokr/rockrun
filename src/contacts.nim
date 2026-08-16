@@ -63,7 +63,7 @@ proc kindOf(gameObject: ptr orxOBJECT): ObjKind =
   elif name == "Firefly" or name == "Butterfly": kCreature
   else:
     case name
-    of "Player": kPlayer
+    of "Player", "Player2", "Player3", "Player4": kPlayer
     of "Diamond": kDiamond
     of "Wall": kWall
     of "Exit": kExit

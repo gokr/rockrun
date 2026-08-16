@@ -41,6 +41,7 @@ type
     taTeleport
     taKillPlayer
     taCheckRespawn
+    taCaptureCollected
     taScreenshot
     taFinish
 
@@ -68,6 +69,7 @@ type
     creatureSpawns: seq[orxVECTOR]
     moveUntil: array[4, float32]
     respawned: array[4, bool]
+    collectedMid: int
     creaturePath: seq[float32]
     creatureLastPos: seq[orxVECTOR]
     exitTeleported: bool
@@ -100,8 +102,10 @@ const
   ScenarioMp: seq[TestAction] = @[
     TestAction(at: 1.0, kind: taMove, player: 0, dx: 1.0, dy: 0.0,
                duration: 3.0),
-    TestAction(at: 1.0, kind: taMove, player: 1, dx: -1.0, dy: 0.0,
+    TestAction(at: 1.0, kind: taMove, player: 1, dx: 1.0, dy: 0.0,
                duration: 3.0),
+    TestAction(at: 1.2, kind: taSpawnGem, player: 1),
+    TestAction(at: 3.0, kind: taCaptureCollected),
     TestAction(at: 3.5, kind: taScreenshot),
     TestAction(at: 4.0, kind: taKillPlayer, player: 1),
     TestAction(at: 6.0, kind: taCheckRespawn, player: 1),
@@ -185,6 +189,8 @@ proc runFinalChecksMp() =
     fmt"expected 2 players, got {world.players.len}")
   testCheck(gs.dirtDug >= 8,
     fmt"both heroes dug only {gs.dirtDug} sand blocks")
+  testCheck(test.collectedMid >= 1,
+    "P2 never collected a gem (attribution broken?)")
   testCheck(world.players[1].lives == 2,
     "P2 did not lose a life to the test kill")
   testCheck(not world.players[1].down, "P2 is down after one kill")
@@ -375,8 +381,8 @@ proc runTestScript(deltaTime: float32) =
       ## that has already been dug (spawning inside solid sand would eject
       ## the gem violently).
       let gem = objectCreateFromConfig("Diamond")
-      if gem != nil:
-        let playerPosition = world.playerObj().getWorldPosition()
+      if gem != nil and action.player < world.players.len:
+        let playerPosition = world.players[action.player].obj.getWorldPosition()
         let (px, py) = world.cellOf(playerPosition)
         let position = world.cellWorld(px + 1, py)
         discard gem.setPosition(
@@ -419,6 +425,8 @@ proc runTestScript(deltaTime: float32) =
           test.respawned[action.player] =
             hypot(position.fX - spawnPosition.fX,
                   position.fY - spawnPosition.fY) < 10.0
+    of taCaptureCollected:
+      test.collectedMid = gs.collected
     of taScreenshot:
       discard screenshots.takeScreenshot()
     of taFinish:
