@@ -199,26 +199,20 @@ proc updateCreatures*(deltaTime: float32) =
       creature.cellY = creature.targetY
       chooseDirection(creature)
       creature.stuckTime = 0.0
-      let next = world.cellWorld(creature.targetX, creature.targetY)
-      let ndx = next.fX - position.fX
-      let ndy = next.fY - position.fY
-      let length = max(1.0'f32, hypot(ndx, ndy))
-      discard creature.obj.setSpeed(newVector(
-        ndx / length * creature.speed, ndy / length * creature.speed, 0.0))
-      # Baseline for the new leg: distance to the freshly chosen target.
-      creature.legStartDist = abs(ndx) + abs(ndy)
       creature.legTime = 0.0
-    else:
-      if creature.stuckTime > StuckLimit:
-        creature.stuckTime = 0.0
-        chooseDirection(creature)
-      # Aim at the (possibly re-steered) target.
-      let aim = world.cellWorld(creature.targetX, creature.targetY)
-      let adx = aim.fX - position.fX
-      let ady = aim.fY - position.fY
-      let length = max(1.0'f32, hypot(adx, ady))
-      discard creature.obj.setSpeed(newVector(
-        adx / length * creature.speed, ady / length * creature.speed, 0.0))
+    elif creature.stuckTime > StuckLimit:
+      creature.stuckTime = 0.0
+      chooseDirection(creature)
+    # Aim at the (possibly re-steered) target.
+    let aim = world.cellWorld(creature.targetX, creature.targetY)
+    let adx = aim.fX - position.fX
+    let ady = aim.fY - position.fY
+    let length = max(1.0'f32, hypot(adx, ady))
+    discard creature.obj.setSpeed(newVector(
+      adx / length * creature.speed, ady / length * creature.speed, 0.0))
+    if dist <= ArrivalDistance:
+      # Baseline for the new leg: distance to the freshly chosen target.
+      creature.legStartDist = abs(adx) + abs(ady)
 
 proc clearCreatures*() =
   ## Drops creature tracking before a world reload destroys the objects.

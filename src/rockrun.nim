@@ -13,7 +13,6 @@
 import os
 import math
 import strformat
-import strutils
 import sequtils
 import options
 
@@ -37,7 +36,6 @@ type
     taSpawnGem
     taSpawnCreature
     taExplodeCreature
-    taCheckBoulder
     taFakeQuota
     taTeleport
     taKillPlayer
@@ -75,7 +73,6 @@ type
     creatureLastPos: seq[orxVECTOR]
     exitTeleported: bool
     completed: bool
-    finished: bool
     failures: seq[string]
 
 const
@@ -91,7 +88,6 @@ const
                cx: 31, cy: 14),
     TestAction(at: 6.5, kind: taExplodeCreature),
     TestAction(at: 8.0, kind: taScreenshot),
-    TestAction(at: 8.0, kind: taCheckBoulder),
     TestAction(at: 8.0, kind: taFakeQuota),
     TestAction(at: 8.0, kind: taTeleport, cx: 35, cy: 19),
     TestAction(at: 8.0, kind: taMove, dx: 1.0, dy: 0.0, duration: 4.0),
@@ -132,7 +128,6 @@ var
   audioObject: ptr orxOBJECT
   startupFrames: int
   initializationSucceeded = false
-  executionFailed = false
   test: TestScript
 
 proc testCheck(condition: bool; message: string) =
@@ -272,9 +267,6 @@ proc startRun() =
   creatures.spawnPending()
   showLevelIntro()
 
-proc restartRun() =
-  startRun()
-
 proc completeLevel() =
   let bonus = int(gs.timeLeft) * gs.timeBonusPerSecond
   addScore(bonus)
@@ -402,11 +394,6 @@ proc runTestScript(deltaTime: float32) =
       if test.boulder != nil:
         test.boulderFellBy =
           test.boulder.getWorldPosition().fY - test.boulderSpawnY
-    of taCheckBoulder:
-      ## Main's name for the same check (its scenario uses taCheckBoulder).
-      if test.boulder != nil:
-        test.boulderFellBy =
-          test.boulder.getWorldPosition().fY - test.boulderSpawnY
     of taSpawnGem:
       ## Drops a diamond right in front of the player, inside the corridor
       ## that has already been dug (spawning inside solid sand would eject
@@ -465,7 +452,6 @@ proc runTestScript(deltaTime: float32) =
         runFinalChecksMp()
       else:
         runFinalChecks()
-      test.finished = true
       setEnginePaused(false)
       discard eventSendShort(EVENT_TYPE_SYSTEM, SYSTEM_EVENT_CLOSE.orxU32)
 
@@ -551,7 +537,7 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
 
   if hasBeenActivated("Restart"):
     if gs.phase in {phGameOver, phAllComplete}:
-      restartRun()
+      startRun()
     elif gs.phase in {phPlaying, phPaused}:
       setEnginePaused(false)
       reloadLevel()
@@ -884,7 +870,7 @@ when isMainModule:
   if setBootstrap(bootstrap).isFailure:
     quit("Could not register the bootstrap callback")
   execute(init, run, exit)
-  if not initializationSucceeded or executionFailed or
+  if not initializationSucceeded or
       ((startupTest or startupTestMp) and test.failures.len > 0):
     quit(1)
   if startupTest and test.boulder == nil:

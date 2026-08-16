@@ -10,14 +10,6 @@ import norx
 import game
 
 type
-  CellKind* = enum
-    cEmpty
-    cDirt
-    cWall
-    cBoulder
-    cGem
-    cExit
-
   LevelDef* = object
     ## Parsed level data before instantiation.
     name*: string
@@ -35,16 +27,13 @@ type
   Player* = object
     ## One hero: physics object, spawn point and per-player state.
     ## Single-player runs use players[0]; the multiplayer fields
-    ## (lives/score/collecting/respawn) are wired up by the game modes
-    ## in later phases.
+    ## (lives/down/respawn) are wired up by the game modes in later
+    ## phases.
     obj*: ptr orxOBJECT
     index*: int
     inputSet*: string
     spawnX*, spawnY*: int
     lives*: int
-    score*: int
-    collected*: int
-    needed*: int
     deathReason*: string
     respawnTimer*: float32
     invulnTimer*: float32
@@ -571,7 +560,7 @@ proc spawnPlayers*(): bool =
 
 proc buildWorld(level: LevelDef): bool =
   ## Instantiates all level objects from a parsed definition.
-  gs.gemTotal = 0
+  var gemCount = 0
   worldH = level.rows.len
   worldW = level.rows[0].len
   worldMinX = -worldW.float32 * CellSize * 0.5'f32
@@ -625,7 +614,7 @@ proc buildWorld(level: LevelDef): bool =
           return false
         discard gem.addFX("SparkleFX")
         gems.add(gem)
-        inc gs.gemTotal
+        inc gemCount
       of 'E':
         exitObject = objectCreateFromConfig("Exit")
         if exitObject == nil or
@@ -650,7 +639,7 @@ proc buildWorld(level: LevelDef): bool =
     echo "Levels need 1-4 player spawns and one exit, got ",
          playerCount, " and ", exitCount
     return false
-  if gs.gemTotal < level.needed:
+  if gemCount < level.needed:
     echo "Level has not enough diamonds"
     return false
 
@@ -666,7 +655,6 @@ proc loadWorld*(index: int): bool =
   gs.levelName = level.name
   gs.needed = level.needed
   gs.collected = 0
-  gs.levelTimeLimit = level.timeLimit
   gs.timeLeft = level.timeLimit
   gs.exitOpen = false
   gs.levelCompleted = false
@@ -699,6 +687,3 @@ proc validateLevels*(): bool =
       echo "Startup check failed: invalid counts in level ", i + 1
       return false
   result = true
-
-proc exitReachable*(): bool =
-  exitObject != nil

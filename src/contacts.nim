@@ -72,6 +72,11 @@ proc kindOf(gameObject: ptr orxOBJECT): ObjKind =
     of "Exit": kExit
     else: kOther
 
+proc pick(firstKind, secondKind: ObjKind; wanted: ObjKind;
+          first, second: ptr orxOBJECT): ptr orxOBJECT =
+  ## The object of the wanted kind, whichever side of the pair it is on.
+  if firstKind == wanted: first else: second
+
 proc impactSpeed(gameObject: ptr orxOBJECT): float32 =
   let speed = gameObject.getSpeed()
   result = abs(speed.fX) + abs(speed.fY)
@@ -146,22 +151,19 @@ proc processContact(contact: Contact) =
     pair = {firstKind, secondKind}
 
   if pair == {kPlayer, kDirt}:
-    let
-      dirt = if firstKind == kDirt: contact.first else: contact.second
-      digger = if firstKind == kPlayer: contact.first else: contact.second
-    digSand(dirt, digger)
+    digSand(pick(firstKind, secondKind, kDirt, contact.first, contact.second),
+            pick(firstKind, secondKind, kPlayer, contact.first, contact.second))
 
   elif pair == {kPlayer, kDiamond}:
     when defined(debugContacts):
+      let gem = pick(firstKind, secondKind, kDiamond,
+                     contact.first, contact.second)
       echo "PAIR player-diamond at ",
-        (if firstKind == kDiamond: contact.first.getWorldPosition().fX
-         else: contact.second.getWorldPosition().fX), ", ",
-        (if firstKind == kDiamond: contact.first.getWorldPosition().fY
-         else: contact.second.getWorldPosition().fY)
-    let
-      gem = if firstKind == kDiamond: contact.first else: contact.second
-      collector = if firstKind == kPlayer: contact.first else: contact.second
-    collectGem(gem, collector)
+        gem.getWorldPosition().fX, ", ", gem.getWorldPosition().fY
+    collectGem(pick(firstKind, secondKind, kDiamond,
+                    contact.first, contact.second),
+               pick(firstKind, secondKind, kPlayer,
+                    contact.first, contact.second))
 
   elif pair == {kPlayer, kExit}:
     if gs.exitOpen:
@@ -171,10 +173,10 @@ proc processContact(contact: Contact) =
 
   elif pair == {kBoulder, kPlayer}:
     let
-      boulder = if firstKind == kBoulder: contact.first
-                else: contact.second
-      heroObj = if firstKind == kPlayer: contact.first
-                else: contact.second
+      boulder = pick(firstKind, secondKind, kBoulder,
+                     contact.first, contact.second)
+      heroObj = pick(firstKind, secondKind, kPlayer,
+                     contact.first, contact.second)
     if heroCrush(boulder, heroObj, contact.normal):
       killHero(heroObj, "Crushed by a boulder")
     elif impactSpeed(boulder) > ThudMinSpeed and
@@ -185,10 +187,10 @@ proc processContact(contact: Contact) =
 
   elif pair == {kPlayer, kCreature}:
     let
-      creatureObj = if firstKind == kCreature: contact.first
-                    else: contact.second
-      heroObj = if firstKind == kPlayer: contact.first
-                else: contact.second
+      creatureObj = pick(firstKind, secondKind, kCreature,
+                         contact.first, contact.second)
+      heroObj = pick(firstKind, secondKind, kPlayer,
+                     contact.first, contact.second)
     if not creatures.isDazed(creatureObj):
       # Dazed creatures (just dug out of their hiding wall) give the
       # player a reaction beat instead of killing instantly.
@@ -199,30 +201,31 @@ proc processContact(contact: Contact) =
   elif pair == {kCreature, kDirt}:
     # Pressed against sand: keeps the wake-up daze alive so digging the
     # wall away never grants an instant kill.
-    creatures.markTouchingSand(
-      if firstKind == kCreature: contact.first else: contact.second)
+    creatures.markTouchingSand(pick(firstKind, secondKind, kCreature,
+                                    contact.first, contact.second))
 
   elif pair == {kBoulder, kCreature}:
     let
-      boulder = if firstKind == kBoulder: contact.first
-                else: contact.second
-      creatureObj = if firstKind == kCreature: contact.first
-                    else: contact.second
+      boulder = pick(firstKind, secondKind, kBoulder,
+                     contact.first, contact.second)
+      creatureObj = pick(firstKind, secondKind, kCreature,
+                         contact.first, contact.second)
     if creatureCrush(boulder, creatureObj, contact.normal):
       creatures.explodeCreature(creatureObj)
 
   elif pair == {kBoulder, kDirt} or pair == {kBoulder, kWall} or
       pair == {kBoulder, kBoulder}:
-    let boulder = if firstKind == kBoulder: contact.first
-                  else: contact.second
+    let
+      boulder = pick(firstKind, secondKind, kBoulder,
+                     contact.first, contact.second)
+      sand = pick(firstKind, secondKind, kDirt,
+                  contact.first, contact.second)
     if impactSpeed(boulder) > ThudMinSpeed and
         gs.worldClockTime - gs.lastThud >= ThudInterval:
       gs.lastThud = gs.worldClockTime
       discard boulder.addSound("LandSound")
     # A resting boulder beds into loose (refined) sand: it slowly eats the
     # grain it rests on, dust and all. Coarse blocks never sink.
-    let sand = if firstKind == kDirt: contact.first
-               else: contact.second
     if objectKind(sand).startsWith("SandFine"):
       world.activateGrainColumn(sand)
       if gs.worldClockTime - gs.lastSink >= 0.35:
@@ -231,8 +234,8 @@ proc processContact(contact: Contact) =
 
   elif pair == {kDiamond, kDirt} or pair == {kDiamond, kWall} or
       pair == {kDiamond, kBoulder} or pair == {kDiamond, kDiamond}:
-    let gem = if firstKind == kDiamond: contact.first
-              else: contact.second
+    let gem = pick(firstKind, secondKind, kDiamond,
+                   contact.first, contact.second)
     if impactSpeed(gem) > ClinkMinSpeed and
         gs.worldClockTime - gs.lastClink >= ClinkInterval:
       gs.lastClink = gs.worldClockTime

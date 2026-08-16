@@ -58,9 +58,6 @@ proc hideMessages*() =
   messageTimer = 0.0
   subMessageTimer = 0.0
 
-proc hudReady*(): bool =
-  scoreObject != nil and messageObject != nil
-
 proc updateUi*(deltaTime: float32) =
   ## Refreshes the HUD text when marked dirty and ages messages.
   if messageTimer > 0.0:

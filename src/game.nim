@@ -74,11 +74,9 @@ type
     diamondScore*: int
     timeBonusPerSecond*: int
     levelName*: string
-    levelTimeLimit*: float32
     timeLeft*: float32
     needed*: int
     collected*: int
-    gemTotal*: int
     exitOpen*: bool
     dirtDug*: int
     timeExpired*: bool ## clock hit zero; alive heroes die once

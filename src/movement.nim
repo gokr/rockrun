@@ -18,11 +18,16 @@ var
   animSawDig* = false
   ## Set when the dig swing animation has been triggered at least once.
 
+proc isPlayerOne(player: Player): bool =
+  ## P1 keeps the classic unsuffixed bindings and animation names; later
+  ## players get their own suffix (P2, P3, P4).
+  player.inputSet == "" or player.inputSet == "P1"
+
 proc inputName(player: Player; base: string): string =
   ## ORX action name for one hero's input: P1 keeps the classic
   ## unsuffixed bindings (MoveLeft, ...), later players get a suffix
   ## (MoveLeftP2, ...) bound to their own keys/controller.
-  if player.inputSet == "" or player.inputSet == "P1":
+  if isPlayerOne(player):
     base
   else:
     base & player.inputSet
@@ -82,8 +87,7 @@ proc playAnim(player: var Player; animName: string) =
     # because ORX registers animations globally and shared names would
     # make heroes reuse each other's anims.
     let fullName =
-      (if player.inputSet == "" or player.inputSet == "P1": animName
-       else: animName & player.inputSet)
+      (if isPlayerOne(player): animName else: animName & player.inputSet)
     let status = player.obj.setCurrentAnim(fullName.cstring)
     when defined(debugAnim):
       echo "ANIM -> ", animName, " status=", status
