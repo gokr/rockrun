@@ -1,23 +1,23 @@
 @echo off
 setlocal DisableDelayedExpansion
-:: build-orx.bat - clone Norx and build orx.dll (debug/release) in the VM.
-::
-:: ORX's own setup.bat runs a GUI-subsystem Rebol binary which cannot run
-:: in an automated WinRM session. This script replicates what setup.r does
-:: with console tools instead: fetch the extern zip into the official cache
-:: location, extract it, copy the Windows premake, generate the gmake
-:: build files, and run mingw32-make.
+REM  build-orx.bat - clone Norx and build orx.dll (debug/release) in the VM.
+REM
+REM  ORX's own setup.bat runs a GUI-subsystem Rebol binary which cannot run
+REM  in an automated WinRM session. This script replicates what setup.r does
+REM  with console tools instead: fetch the extern zip into the official cache
+REM  location, extract it, copy the Windows premake, generate the gmake
+REM  build files, and run mingw32-make.
 set BUILD_ROOT=C:\Users\vagrant
 set SHARED=%~1
 if "%SHARED%"=="" set SHARED=C:\Users\vagrant\shared
 
-:: WinRM sessions do not inherit the interactive session PATH - add the
-:: tools explicitly (installed by scripts/windows-setup.bat).
+REM  WinRM sessions do not inherit the interactive session PATH - add the
+REM  tools explicitly (installed by scripts/windows-setup.bat).
 set "PATH=%PROGRAMFILES%\Git\cmd;%ALLUSERSPROFILE%\chocolatey\bin;%PROGRAMFILES%\Nim\bin;%PATH%"
 
 echo === Building ORX (Windows) ===
 
-:: Norx checkout
+REM  Norx checkout
 if not exist "%BUILD_ROOT%\norx\.git" (
     echo Cloning Norx...
     cd /d "%BUILD_ROOT%"
@@ -32,7 +32,7 @@ if not exist "%BUILD_ROOT%\norx\.git" (
     git pull
 )
 
-:: ORX submodule
+REM  ORX submodule
 cd /d "%BUILD_ROOT%\norx"
 if not exist "orx\.git" (
     echo Initializing ORX submodule...
@@ -46,7 +46,7 @@ if not exist "orx\.git" (
 
 cd /d "%BUILD_ROOT%\norx\orx"
 
-:: Extern version required by this ORX revision
+REM  Extern version required by this ORX revision
 for /f "delims=" %%v in (.extern) do set EXTERN_VER=%%v
 if "%EXTERN_VER%"=="" (
     echo ERROR: could not read .extern version
@@ -54,14 +54,14 @@ if "%EXTERN_VER%"=="" (
     exit /b 1
 )
 
-:: Generate the gmake files only when they are missing (previous
-:: half-finished attempts may leave a partial extern/ around).
+REM  Generate the gmake files only when they are missing (previous
+REM  half-finished attempts may leave a partial extern/ around).
 if not exist "code\build\windows\gmake\Makefile" (
     echo Generating ORX gmake build files...
 
-    :: Fetch the extern zip into the cache (setup.r's own cache location).
-    :: The primary host (orx-project.org) is currently down - use the
-    :: codeload fallback first, mirroring setup.r's host list.
+REM Fetch the extern zip into the cache setup r's own cache location 
+REM The primary host orx-project org is currently down - use the
+    REM  codeload fallback first, mirroring setup.r's host list.
     if not exist "cache\%EXTERN_VER%.zip" (
         echo Downloading ORX extern %EXTERN_VER%...
         mkdir cache 2>nul
@@ -79,7 +79,7 @@ if not exist "code\build\windows\gmake\Makefile" (
         echo ORX extern %EXTERN_VER% found in cache.
     )
 
-    :: Extract the extern dir; verify the premake we need actually made it.
+    REM  Extract the extern dir; verify the premake we need actually made it.
     if not exist "extern\premake\bin\windows\premake4.exe" (
         echo Extracting ORX extern...
         if exist extern rd /s /q extern
@@ -96,9 +96,9 @@ if not exist "code\build\windows\gmake\Makefile" (
         echo ORX extern already extracted.
     )
 
-    :: MinGW runtime: premake4.exe and mingw32-make are MinGW binaries
-    :: that need libwinpthread/libstdc++/libgcc DLLs. Self-heal in case
-    :: windows-setup.bat's mingw step did not run.
+    REM  MinGW runtime: premake4.exe and mingw32-make are MinGW binaries
+    REM  that need libwinpthread/libstdc++/libgcc DLLs. Self-heal in case
+    REM  windows-setup.bat's mingw step did not run.
     where mingw32-make >nul 2>&1
     if %errorLevel% neq 0 (
         echo Installing MinGW via Chocolatey...
@@ -111,7 +111,7 @@ if not exist "code\build\windows\gmake\Makefile" (
     )
     set "PATH=%ALLUSERSPROFILE%\chocolatey\lib\mingw\tools\install\mingw64\bin;%PATH%"
 
-    :: Copy the Windows premake into code/build and generate
+    REM  Copy the Windows premake into code/build and generate
     copy /y "extern\premake\bin\windows\premake4.exe" "code\build\premake4.exe" >nul
     cd /d "code\build"
     premake4.exe gmake
@@ -122,7 +122,7 @@ if not exist "code\build\windows\gmake\Makefile" (
     )
 )
 
-:: Build
+REM  Build
 cd /d "code\build\windows\gmake"
 mingw32-make config=release64
 if %errorLevel% neq 0 (
@@ -138,3 +138,4 @@ strip "%SHARED%\build\orx\orx.dll"
 
 echo === ORX build done ===
 endlocal
+
