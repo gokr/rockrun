@@ -33,8 +33,8 @@ licensed under [Creative Commons CC0 1.0](https://creativecommons.org/publicdoma
 
 ## Fonts
 
-- `font/pressstart2p.ttf` — Press Start 2P by Cody "CodeMan38" Boisclair,
-  licensed under the SIL Open Font License 1.1 (see `font/OFL.txt`),
+- `font/bungee.ttf` — Bungee by David Jonathan Ross, licensed under the
+  SIL Open Font License 1.1 (see `font/OFL-Bungee.txt`),
   sourced from the [google/fonts repository](https://github.com/google/fonts).
 
 ## Sound effects
