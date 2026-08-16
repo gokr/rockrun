@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Big/huge boulders now spawn inside pre-carved hollow pockets instead of
+  overlapping the sand lattice - no more deep-penetration "rock pops" when
+  digging around them.
+- Boulder textures redrawn to fill their cell (solid rock ~63/64px of the
+  canvas) so rocks visually sit against the sand instead of floating with
+  a visible gap.
+- Simulation clock tied to 60Hz instead of the display refresh rate: heavy
+  caves no longer run in slow motion when the renderer can't sustain
+  display-rate fps (e.g. Rolling Fields).
+
 ## [1.0.0] - 2026-08-16
 
 First stable release.

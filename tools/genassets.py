@@ -36,15 +36,15 @@ def make_boulder(name, frac, seed):
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
 
     rad = frac * size / 2
-    cx = size / 2 + r.uniform(-1.5, 1.5)
-    cy = size / 2 + r.uniform(-1.5, 1.5)
+    cx = size / 2 + r.uniform(-1.0, 1.0)
+    cy = size / 2 + r.uniform(-1.0, 1.0)
     n = r.randint(9, 12)
     base_pts = []
     for i in range(n):
         ang = 2 * math.pi * i / n
-        wobble = r.uniform(0.82, 1.0)
+        wobble = r.uniform(0.9, 1.0)
         px = cx + math.cos(ang) * rad * wobble
-        py = cy + math.sin(ang) * rad * wobble * r.uniform(0.9, 1.05)
+        py = cy + math.sin(ang) * rad * wobble * r.uniform(0.94, 1.02)
         base_pts.append((px, py))
 
     mask = Image.new("L", (size, size), 0)
@@ -85,15 +85,14 @@ def make_boulder(name, frac, seed):
             rim.line([p1, p2], fill=(235, 228, 210, 230), width=3)
     img.putalpha(mask)
 
-    # soft drop shadow
+    # soft drop shadow, close and subtle
     shadow = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     sh = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(sh).polygon(base_pts, fill=110)
-    sh = sh.filter(ImageFilter.GaussianBlur(3))
+    ImageDraw.Draw(sh).polygon(base_pts, fill=70)
+    sh = sh.filter(ImageFilter.GaussianBlur(1.5))
     shadow.putalpha(sh)
-    outpos = (1, 2)
     final = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    final.paste(shadow, outpos, shadow)
+    final.paste(shadow, (1, 1), shadow)
     final.paste(img, (0, 0), mask)
     final.save(f"/home/gokr/git/rockrun/data/texture/{name}.png")
     return final
@@ -296,11 +295,12 @@ def add_pickaxe(tile, step):
 
 
 if __name__ == "__main__":
-    # All blobs fill ~94% of the canvas so that object scale maps physics
-    # sphere radius directly to what you see (auto-sized parts).
-    make_boulder("boulder_small", 0.94, 11)
-    make_boulder("boulder", 0.94, 23)
-    make_boulder("boulder_big", 0.94, 41)
+    # Blobs are drawn slightly larger than the canvas so the rock fills it
+    # nearly edge to edge: the visible rock then matches the physics
+    # sphere (object size = full cell), leaving no gap to the sand.
+    make_boulder("boulder_small", 1.06, 11)
+    make_boulder("boulder", 1.06, 23)
+    make_boulder("boulder_big", 1.06, 41)
     make_diamond(5)
     make_dirt(3)
     # Fireflies: teal wall-hugger (turns right) and purple butterfly
