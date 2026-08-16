@@ -23,6 +23,10 @@ heroes. Repos: `~/git/rockrun` (main) and `~/git/rockrun-mp`
 
 ## Standard loop (after EVERY change to src/, data/config/, tools/)
 
+0. **ORX/Norx behavior lookups**: use the global `orx_docs` tool (local
+   source + wiki + doxygen) and the global `orx-dev` skill — never guess
+   config semantics.
+
 1. **Build**: `nim c -o:rockrun src/rockrun.nim` (debug → liborxd).
    `nimble release` for the release build (liborx).
 2. **Test**: use the `rockrun_test` tool (build + run + verdicts + fresh
