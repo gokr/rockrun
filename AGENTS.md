@@ -60,6 +60,15 @@ in automated environments can starve present events and hang the renderer in
 Also re-generate levels after changing `tools/genlevels.py`:
 `python3 tools/genlevels.py`.
 
+## Dev tooling (pi agent)
+
+- `.pi/extensions/rockrun-test.ts` — pi tool `rockrun_test`: builds the
+  game, runs the startup test and reports verdicts plus fresh screenshots.
+- `.pi/skills/rockrun-dev/` — pi skill bundling this workflow (build/test
+  loop, ORX config facts, multiplayer worktree conventions).
+- A generic ORX config linter (`orx_ini_validate`) lives globally in pi
+  (`~/.pi/agent/extensions/`); it works on any ORX project.
+
 ## Conventions and hard-won facts
 
 - ORX config: `#` is the LIST separator, `"..."` starts a BLOCK literal.

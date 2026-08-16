@@ -578,7 +578,8 @@ proc bootstrap(): orxSTATUS {.cdecl.} =
     if result.isFailure:
       return
     discard addStorage(TEXTURE_KZ_RESOURCE_GROUP, basePath / "texture", false)
-    discard addStorage(TEXTURE_KZ_RESOURCE_GROUP, basePath / "font", false)
+    # Typefaces are located through the "Font" resource group.
+    discard addStorage("Font", basePath / "font", false)
     discard addStorage(SOUND_KZ_RESOURCE_GROUP, basePath / "sound", false)
     discard addStorage(SOUND_KZ_RESOURCE_GROUP, basePath / "music", false)
     return
