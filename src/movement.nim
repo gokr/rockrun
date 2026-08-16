@@ -103,10 +103,13 @@ proc updatePlayer*(player: var Player; deltaTime: float32) =
     if player.digAnimTimer <= 0.0 and dx == 0.0 and dy == 0.0:
       playAnim(player, "Idle")
   if dug and player.digAnimTimer <= 0.0:
-    # 3 frames at ~0.12s; retriggers every frame the player keeps
-    # digging, so the swing loops for the whole dig.
-    player.digAnimTimer = 0.36
-    playAnim(player, "Dig")
+    # Every other dig triggers the swing animation, so repeated digging
+    # doesn't look frantic.
+    player.digFlip = not player.digFlip
+    if player.digFlip:
+      # 3 frames at ~0.12s; retriggers while the player keeps digging.
+      player.digAnimTimer = 0.36
+      playAnim(player, "Dig")
   elif player.digAnimTimer <= 0.0:
     if dx != 0.0 or dy != 0.0:
       playAnim(player, "Run")

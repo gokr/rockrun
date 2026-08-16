@@ -51,6 +51,7 @@ type
     invulnTimer*: float32
     currentAnim*: string
     digAnimTimer*: float32
+    digFlip*: bool
 
 const
   ## Sub-grid size per cell (4x4) and block size in pixels.

@@ -58,6 +58,7 @@ type
     spawnedCreature: ptr orxOBJECT
     explodedGemCount: int
     collectedBeforeExit: int
+    creatureSpawns: seq[orxVECTOR]
     moveUntil: float32
     exitTeleported: bool
     completed: bool
@@ -120,6 +121,15 @@ proc runFinalChecks() =
     fmt"creature explosion spawned {test.explodedGemCount} gems")
   testCheck(test.completed,
     "player could not complete the cave through the exit")
+  var creaturesMoved = false
+  for i, creature in creatures.creatures:
+    if i < test.creatureSpawns.len and creature.obj != nil:
+      let position = creature.obj.getWorldPosition()
+      if hypot(position.fX - test.creatureSpawns[i].fX,
+               position.fY - test.creatureSpawns[i].fY) > 10.0:
+        creaturesMoved = true
+  testCheck(creaturesMoved,
+    "cave-2 creatures did not move (wall-hugging steering stuck?)")
   testCheck(gs.levelIndex == 1,
     fmt"the second cave did not load (levelIndex={gs.levelIndex})")
   testCheck(gs.phase in {phIntro, phPlaying},
@@ -165,6 +175,12 @@ proc reloadLevel() =
   if world.loadWorld(gs.levelIndex):
     creatures.clearCreatures()
     creatures.spawnPending()
+    if test.active and gs.levelIndex == 1:
+      # Record cave-2 creature positions so the test can verify they
+      # actually move (wall-hugging steering).
+      test.creatureSpawns.setLen(0)
+      for creature in creatures.creatures:
+        test.creatureSpawns.add(creature.obj.getWorldPosition())
     dyingHandled = false
     gs.shake = 0.0
     showLevelIntro()
@@ -569,7 +585,8 @@ proc bootstrap(): orxSTATUS {.cdecl.} =
     if result.isFailure:
       return
     discard addStorage(TEXTURE_KZ_RESOURCE_GROUP, basePath / "texture", false)
-    discard addStorage(TEXTURE_KZ_RESOURCE_GROUP, basePath / "font", false)
+    # Typefaces are located through the "Font" resource group.
+    discard addStorage("Font", basePath / "font", false)
     discard addStorage(SOUND_KZ_RESOURCE_GROUP, basePath / "sound", false)
     discard addStorage(SOUND_KZ_RESOURCE_GROUP, basePath / "music", false)
     return

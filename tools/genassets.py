@@ -213,34 +213,35 @@ def make_dirt(seed):
 
 
 def make_firefly(name, body_rgb, wing_rgb, seed):
-    """Glowing bug sprite: winged critter that hugs walls."""
+    """Glowing bug sprite: winged critter that hugs walls. Drawn large in
+    the canvas so the critter reads clearly at game scale."""
     r = random.Random(seed)
     size = SIZE
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     cx, cy = size / 2, size / 2
 
     glow = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(glow).ellipse([6, 6, size - 6, size - 6], fill=70)
-    glow = glow.filter(ImageFilter.GaussianBlur(5))
+    ImageDraw.Draw(glow).ellipse([2, 2, size - 2, size - 2], fill=90)
+    glow = glow.filter(ImageFilter.GaussianBlur(6))
     glow_img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     glow_img.paste(Image.new("RGB", (size, size), body_rgb), (0, 0), glow)
     img.paste(glow_img, (0, 0), glow)
 
     d = ImageDraw.Draw(img)
-    # two wings
+    # two big wings reaching the canvas edges
     for sx in (-1, 1):
-        wpts = [(cx, cy - 2),
-                (cx + sx * 24, cy - 14),
-                (cx + sx * 22, cy + 2),
-                (cx, cy + 6)]
-        d.polygon(wpts, fill=wing_rgb + (150,), outline=wing_rgb)
+        wpts = [(cx, cy - 4),
+                (cx + sx * 30, cy - 18),
+                (cx + sx * 28, cy + 4),
+                (cx, cy + 8)]
+        d.polygon(wpts, fill=wing_rgb + (170,), outline=(20, 20, 40, 255))
     # body
-    d.ellipse([cx - 8, cy - 8, cx + 8, cy + 8],
-              fill=body_rgb + (255,), outline=(30, 30, 50))
-    d.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=(255, 255, 255))
+    d.ellipse([cx - 13, cy - 13, cx + 13, cy + 13],
+              fill=body_rgb + (255,), outline=(25, 25, 45, 255))
+    d.ellipse([cx - 5, cy - 5, cx + 5, cy + 5], fill=(255, 255, 255, 255))
     # eyes
-    d.ellipse([cx - 5, cy - 6, cx - 1, cy - 2], fill=(10, 10, 20))
-    d.ellipse([cx + 1, cy - 6, cx + 5, cy - 2], fill=(10, 10, 20))
+    d.ellipse([cx - 8, cy - 9, cx - 2, cy - 3], fill=(10, 10, 25, 255))
+    d.ellipse([cx + 2, cy - 9, cx + 8, cy - 3], fill=(10, 10, 25, 255))
     img.save(f"/home/gokr/git/rockrun/data/texture/{name}.png")
     return img
 
@@ -269,23 +270,28 @@ def make_hero_strips():
 
 
 def add_pickaxe(tile, step):
-    """Draws a swinging pickaxe over a dig frame: step 0 winds up, step 1
-    is overhead, step 2 is swung down in front."""
+    """Draws a clearly visible swinging pickaxe over a dig frame:
+    step 0 winds up, step 1 is overhead, step 2 is swung down in front."""
     d = ImageDraw.Draw(tile)
-    angles = {0: -55, 1: 90, 2: -150}
+    angles = {0: -60, 1: 75, 2: -140}
     angle = math.radians(angles[step])
-    px, py = 13.5, 13.0            # grip point (hands)
-    hx = px + 11 * math.cos(angle)
-    hy = py + 11 * math.sin(angle)
-    # handle
-    d.line([(px, py), (hx, hy)], fill=(128, 84, 40, 255), width=2)
-    # head: small arc perpendicular to the handle
-    import math as _m
-    perp = angle + _m.pi / 2
-    hw = 4.5
-    a1 = (hx + hw * math.cos(perp), hy + hw * math.sin(perp))
-    a2 = (hx - hw * math.cos(perp), hy - hw * math.sin(perp))
-    d.line([a1, a2], fill=(190, 195, 200, 255), width=3)
+    px, py = 13.0, 14.0            # grip point (hands)
+    handle_len = 14.5
+    hx = px + handle_len * math.cos(angle)
+    hy = py + handle_len * math.sin(angle)
+    # handle: thick brown shaft with a darker outline
+    d.line([(px, py), (hx, hy)], fill=(70, 40, 15, 255), width=5)
+    d.line([(px, py), (hx, hy)], fill=(140, 90, 35, 255), width=3)
+    # head: crescent pick, drawn as two short thick strokes at the tip
+    perp = angle + math.pi / 2
+    head_pts = [(hx + 7.5 * math.cos(perp), hy + 7.5 * math.sin(perp)),
+                (hx - 4.0 * math.cos(perp), hy - 4.0 * math.sin(perp))]
+    d.line(head_pts, fill=(30, 30, 35, 255), width=6)
+    d.line(head_pts, fill=(205, 210, 215, 255), width=3)
+    # small bright sparkle at the working end
+    ex = hx + 8.5 * math.cos(perp)
+    ey = hy + 8.5 * math.sin(perp)
+    d.ellipse([ex - 1.5, ey - 1.5, ex + 1.5, ey + 1.5], fill=(255, 255, 240, 255))
     return tile
 
 
