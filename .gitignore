@@ -5,8 +5,8 @@
 
 # Test artifacts
 /screenshots/
-
 # OS/editor noise
 .DS_Store
 __pycache__/
 build/
+squashfs-root/
