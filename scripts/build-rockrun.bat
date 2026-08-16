@@ -6,6 +6,10 @@ set BUILD_ROOT=C:\Users\vagrant
 set SHARED=%~1
 if "%SHARED%"=="" set SHARED=C:\Users\vagrant\shared
 
+:: WinRM sessions do not inherit the interactive session PATH - add the
+:: tools explicitly (installed by scripts/windows-setup.bat).
+set "PATH=%PROGRAMFILES%\Nim\bin;%PROGRAMFILES%\Git\cmd;%ALLUSERSPROFILE%\chocolatey\bin;%PATH%"
+
 echo === Building Rockrun (Windows) ===
 
 if not exist "%BUILD_ROOT%\norx" (
