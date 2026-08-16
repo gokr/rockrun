@@ -65,6 +65,9 @@ Local co-op multiplayer.
 - Crush impact direction: the boulder's momentum is projected on the
   contact normal, so a rock falling straight onto your head crushes,
   while one grazing past your side does not.
+- Digging no longer awards score (diamonds and time bonus only).
+- Respawn picks the nearest free cell: respawning on top of a teammate
+  made the sprites overlap, which looked like the wrong player color.
 - Countdown beats are all equal (0.5s); the first beat used to be 1.5s
   and the "3" text vanished mid-beat, leaving a blank pause.
 

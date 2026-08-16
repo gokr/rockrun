@@ -52,6 +52,7 @@ type
     digAnimTimer*: float32
     digFlip*: bool
     down*: bool ## out of lives for the run (spectating)
+    color*: orxVECTOR ## config tint (0..1 RGB), re-applied at respawn
 
 const
   ## Sub-grid size per cell (4x4) and block size in pixels.
@@ -272,7 +273,6 @@ proc killPlayer*(index: int; reason: string): bool =
     hero.respawnTimer = DyingTime
     hero.invulnTimer = InvulnTime
     discard hero.obj.addSound("LoseSound")
-    discard hero.obj.addFX("HitFlash")
   else:
     hero.down = true
     gs.runDown[index] = true
@@ -280,16 +280,55 @@ proc killPlayer*(index: int; reason: string): bool =
     destroyObject(hero.obj)
     hero.obj = nil
 
+proc cellBlocked(x, y: int): bool =
+  ## True when a cell can't be used for respawn: wall, big sand block,
+  ## or live refined grains.
+  if x < 0 or x >= worldW or y < 0 or y >= worldH:
+    return true
+  let index = cellIndex(x, y)
+  walls[index] or sandCells[index].big != nil or grainCounts[index] > 0
+
+proc freeRespawnSpot(index: int): orxVECTOR =
+  ## The hero's spawn cell, or the nearest free cell around it when the
+  ## spawn is blocked (sand) or occupied by another hero - respawning on
+  ## top of a teammate makes the sprites overlap and looks like the
+  ## wrong color.
+  let hero = players[index]
+  var spot = cellWorld(hero.spawnX, hero.spawnY)
+  let occupied = proc(x, y: int): bool =
+    result = false
+    for other in players:
+      if other.index == index or other.obj == nil or other.down:
+        continue
+      let position = other.obj.getWorldPosition()
+      if abs(position.fX - cellWorld(x, y).fX) < 24.0 and
+          abs(position.fY - cellWorld(x, y).fY) < 24.0:
+        return true
+  if not occupied(hero.spawnX, hero.spawnY):
+    return spot
+  # Search in expanding rings around the spawn cell.
+  for ring in 1 .. 4:
+    for dy in -ring .. ring:
+      for dx in -ring .. ring:
+        if max(abs(dx), abs(dy)) != ring:
+          continue
+        let (x, y) = (hero.spawnX + dx, hero.spawnY + dy)
+        if cellBlocked(x, y) or occupied(x, y):
+          continue
+        return cellWorld(x, y)
+  spot
+
 proc respawnPlayer*(index: int) =
   ## Teleports a hero back to its spawn cell (invulnerability was granted
-  ## when the death happened).
+  ## when the death happened) and re-applies its config color.
   if index < 0 or index >= players.len:
     return
   let hero = addr players[index]
   if hero.obj == nil or hero.down:
     return
   hero.respawnTimer = 0.0
-  let position = cellWorld(hero.spawnX, hero.spawnY)
+  discard setRGB(hero.obj, addr hero.color)
+  let position = freeRespawnSpot(index)
   discard hero.obj.setWorldPosition(
     newVector(position.fX, position.fY, PlayerZ))
   spawnBurst("GemSparkle", position, 3)
@@ -323,7 +362,6 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT;
   destroyObject(gameObject)
   gs.dirtDug += 1
   dugThisFrame += 1
-  addScore(gs.digScore)
   gs.hudDirty = true
 
 proc refineSand*(gameObject: ptr orxOBJECT) =
@@ -513,11 +551,20 @@ proc spawnPlayers*(): bool =
     return false
   for index in 0 ..< gs.playerCount:
     let spawnPoint = playerSpawns[index]
-    let hero = objectCreateFromConfig(
-      (if index == 0: "Player" else: "Player" & $(index + 1)))
+    let configName =
+      (if index == 0: "Player" else: "Player" & $(index + 1))
+    let hero = objectCreateFromConfig(configName)
     if hero == nil:
       echo "Could not create the player"
       return false
+    # Config tint, normalized to 0..1. Explicitly applied (and re-applied
+    # at respawn): ORX FX tracks can leave the object color modified.
+    var heroColor = newVector(1.0, 1.0, 1.0)
+    if pushSection(configName).isSuccess:
+      if hasValue("Color") == orxTRUE:
+        discard getColorVector("Color", COLORSPACE_RGB, addr heroColor)
+      discard popSection()
+    discard setRGB(hero, addr heroColor)
     let position = cellWorld(spawnPoint.x, spawnPoint.y)
     if hero.setPosition(
         newVector(position.fX, position.fY, PlayerZ)).isFailure:
@@ -529,7 +576,8 @@ proc spawnPlayers*(): bool =
       spawnX: spawnPoint.x,
       spawnY: spawnPoint.y,
       lives: gs.runLives[index],
-      down: gs.runDown[index]))
+      down: gs.runDown[index],
+      color: heroColor))
   result = true
 
 proc buildWorld(level: LevelDef): bool =

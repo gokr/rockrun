@@ -61,7 +61,6 @@ type
     levelIndex*: int
     levelCount*: int
     diamondScore*: int
-    digScore*: int
     timeBonusPerSecond*: int
     levelName*: string
     levelTimeLimit*: float32
