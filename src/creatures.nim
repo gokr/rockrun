@@ -76,7 +76,8 @@ proc chooseDirection(creature: var Creature) =
 
 proc spawnCreature*(configName: string; cx, cy: int;
                     kind: CreatureKind): ptr orxOBJECT =
-  ## Spawns a creature at a cell center, initially moving right.
+  ## Spawns a creature at a cell center; its initial direction is chosen
+  ## against the occupancy map so it never starts pressing into a wall.
   result = objectCreateFromConfig(configName)
   if result != nil:
     let position = world.cellWorld(cx, cy)
@@ -87,6 +88,7 @@ proc spawnCreature*(configName: string; cx, cy: int;
                            dirX: 1, dirY: 0, targetX: cx + 1, targetY: cy,
                            speed: (if kind == ckFirefly: FireflySpeed
                                    else: ButterflySpeed)))
+    chooseDirection(creatures[creatures.high])
 
 proc explodeCreature*(gameObject: ptr orxOBJECT) =
   ## A falling boulder crushed the creature: burst into nine diamonds.
@@ -126,6 +128,10 @@ proc updateCreatures*(deltaTime: float32) =
   for creature in creatures.mitems:
     if creature.obj == nil or world.isDestroyed(creature.obj):
       continue
+    # If the current target became blocked (e.g. sand refined or a wall
+    # neighbour carved), re-steer instead of pressing against it.
+    if blockedAt(creature.targetX, creature.targetY):
+      chooseDirection(creature)
     let position = creature.obj.getWorldPosition()
     let target = world.cellWorld(creature.targetX, creature.targetY)
     let dx = target.fX - position.fX

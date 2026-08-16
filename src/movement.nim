@@ -15,6 +15,7 @@ var
   ## When set (startup test), replaces live input.
   currentAnim = ""
   digAnimTimer: float32 = 0.0
+  digFlip = false
   animSawDig* = false
   ## Set when the dig swing animation has been triggered at least once.
 
@@ -94,10 +95,13 @@ proc updatePlayer*(deltaTime: float32) =
     if digAnimTimer <= 0.0 and dx == 0.0 and dy == 0.0:
       playAnim("Idle")
   if dug and digAnimTimer <= 0.0:
-    # 3 frames at ~0.12s; retriggers every frame the player keeps
-    # digging, so the swing loops for the whole dig.
-    digAnimTimer = 0.36
-    playAnim("Dig")
+    # Every other dig triggers the swing animation, so repeated digging
+    # doesn't look frantic.
+    digFlip = not digFlip
+    if digFlip:
+      # 3 frames at ~0.12s; retriggers while the player keeps digging.
+      digAnimTimer = 0.36
+      playAnim("Dig")
   elif digAnimTimer <= 0.0:
     if dx != 0.0 or dy != 0.0:
       playAnim("Run")
