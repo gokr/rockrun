@@ -222,6 +222,7 @@ proc killPlayer*(index: int; reason: string) =
     return
   dec hero.lives
   hero.deathReason = reason
+  gs.runLives[index] = hero.lives
   gs.shake = 9.0
   gs.hudDirty = true
   if hero.lives > 0:
@@ -231,6 +232,7 @@ proc killPlayer*(index: int; reason: string) =
     discard hero.obj.addFX("HitFlash")
   else:
     hero.down = true
+    gs.runDown[index] = true
     discard hero.obj.addSound("LoseSound")
     destroyObject(hero.obj)
     hero.obj = nil
@@ -424,7 +426,8 @@ proc spawnPlayers*(): bool =
       inputSet: (if index == 0: "P1" else: "P" & $(index + 1)),
       spawnX: spawnPoint.x,
       spawnY: spawnPoint.y,
-      lives: gs.livesStart))
+      lives: gs.runLives[index],
+      down: gs.runDown[index]))
   result = true
 
 proc buildWorld(level: LevelDef): bool =

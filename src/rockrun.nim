@@ -39,6 +39,8 @@ type
     taExplodeCreature
     taFakeQuota
     taTeleport
+    taKillPlayer
+    taCheckRespawn
     taScreenshot
     taFinish
 
@@ -55,6 +57,7 @@ type
   TestScript = object
     ## Scripted in-engine verification used with --startup-test.
     active: bool
+    mp: bool ## multiplayer variant (--startup-test-mp)
     time: float32
     boulder: ptr orxOBJECT
     boulderSpawnY: float32
@@ -64,6 +67,7 @@ type
     collectedBeforeExit: int
     creatureSpawns: seq[orxVECTOR]
     moveUntil: array[4, float32]
+    respawned: array[4, bool]
     exitTeleported: bool
     completed: bool
     finished: bool
@@ -88,13 +92,34 @@ const
     TestAction(at: 14.0, kind: taFinish)
   ]
 
+const
+  ## Multiplayer variant (--startup-test-mp): two heroes dig, P2 dies and
+  ## respawns, P1 completes the cave (coop finish).
+  ScenarioMp: seq[TestAction] = @[
+    TestAction(at: 1.0, kind: taMove, player: 0, dx: 1.0, dy: 0.0,
+               duration: 3.0),
+    TestAction(at: 1.0, kind: taMove, player: 1, dx: -1.0, dy: 0.0,
+               duration: 3.0),
+    TestAction(at: 3.5, kind: taScreenshot),
+    TestAction(at: 4.0, kind: taKillPlayer, player: 1),
+    TestAction(at: 6.0, kind: taCheckRespawn, player: 1),
+    TestAction(at: 6.0, kind: taScreenshot),
+    TestAction(at: 6.5, kind: taFakeQuota),
+    TestAction(at: 7.0, kind: taTeleport, player: 0, cx: 35, cy: 19),
+    TestAction(at: 7.0, kind: taMove, player: 0, dx: 1.0, dy: 0.0,
+               duration: 3.0),
+    TestAction(at: 12.0, kind: taFinish)
+  ]
+
 var
   scenarioIndex = 0
+  testScenario: seq[TestAction]
 
 var
   mainViewport: ptr orxVIEWPORT
   mainCamera: ptr orxCAMERA
   cameraHalfW, cameraHalfH: float32
+  cameraNear, cameraFar: float32
   coreClock: ptr orxCLOCK
   audioObject: ptr orxOBJECT
   startupFrames: int
@@ -147,7 +172,26 @@ proc runFinalChecks() =
     echo "Rockrun engine checks passed"
     echo "Rockrun completion checks passed"
 
+proc runFinalChecksMp() =
+  ## Final checks for the multiplayer variant.
+  testCheck(world.players.len == 2,
+    fmt"expected 2 players, got {world.players.len}")
+  testCheck(gs.dirtDug >= 8,
+    fmt"both heroes dug only {gs.dirtDug} sand blocks")
+  testCheck(world.players[1].lives == 2,
+    "P2 did not lose a life to the test kill")
+  testCheck(not world.players[1].down, "P2 is down after one kill")
+  testCheck(world.players[1].obj != nil, "P2 object missing after respawn")
+  testCheck(test.respawned[1], "P2 did not respawn at the spawn cell")
+  testCheck(test.completed,
+    "P1 could not complete the cave through the exit")
+  testCheck(gs.levelIndex == 1,
+    fmt"the second cave did not load (levelIndex={gs.levelIndex})")
+  if test.failures.len == 0:
+    echo "Rockrun multiplayer checks passed"
+
 let startupTest = "--startup-test" in commandLineParams()
+let startupTestMp = "--startup-test-mp" in commandLineParams()
 
 proc setEnginePaused(paused: bool) =
   ## Zeroes dt for the whole core clock: physics and logic freeze while
@@ -173,9 +217,30 @@ proc reloadLevel() =
     gs.shake = 0.0
     showLevelIntro()
 
-proc restartRun() =
+var
+  joinedPlayers: array[4, bool]
+
+proc joinActivated(index: int): bool =
+  ## A controller Start press or any movement input of that player
+  ## counts as a join request in the lobby.
+  if hasBeenActivated("JoinP" & $(index + 1)):
+    return true
+  for base in ["MoveLeft", "MoveRight", "MoveUp", "MoveDown"]:
+    if hasBeenActivated(base & "P" & $(index + 1)):
+      return true
+  false
+
+proc startRun() =
+  ## Begins the run with the joined players (P1 always in).
+  gs.playerCount = max(1, joinedPlayers.count(true))
   resetRun()
-  reloadLevel()
+  if not world.loadWorld(0):
+    return
+  creatures.spawnPending()
+  showLevelIntro()
+
+proc restartRun() =
+  startRun()
 
 proc completeLevel() =
   let bonus = int(gs.timeLeft) * gs.timeBonusPerSecond
@@ -188,20 +253,51 @@ proc completeLevel() =
   enterPhase(phComplete)
 
 proc updateCamera(deltaTime: float32) =
-  let hero = world.playerObj()
-  if hero == nil or mainCamera == nil:
+  if mainCamera == nil:
     return
-  let target = hero.getWorldPosition()
-  var cameraPosition: orxVECTOR
-  discard getPosition(mainCamera, addr cameraPosition)
+  # Bounding box of all active heroes (down players don't count).
+  var
+    minX, maxX, minY, maxY: float32
+    count = 0
+  for hero in world.players:
+    if hero.obj == nil or hero.down:
+      continue
+    let position = hero.obj.getWorldPosition()
+    if count == 0:
+      minX = position.fX
+      maxX = position.fX
+      minY = position.fY
+      maxY = position.fY
+    else:
+      minX = min(minX, position.fX)
+      maxX = max(maxX, position.fX)
+      minY = min(minY, position.fY)
+      maxY = max(maxY, position.fY)
+    inc count
+  if count == 0:
+    return
+
+  # Frustum zoom: zoom out (never in) so every hero fits with margin.
+  let
+    baseW = cameraHalfW * 2.0
+    baseH = cameraHalfH * 2.0
+    needW = maxX - minX + CameraMargin * 2.0
+    needH = maxY - minY + CameraMargin * 2.0
+    targetW = clamp(max(baseW, needW), baseW, baseW * CameraMaxZoom)
+    targetH = clamp(max(baseH, needH), baseH, baseH * CameraMaxZoom)
+    alpha = 1.0'f32 - exp(-CameraLerpRate * deltaTime)
+  cameraHalfW += (targetW * 0.5 - cameraHalfW) * alpha
+  cameraHalfH += (targetH * 0.5 - cameraHalfH) * alpha
+  discard setFrustum(mainCamera, cameraHalfW * 2.0, cameraHalfH * 2.0,
+                     cameraNear, cameraFar)
 
   let
-    halfFreeX = max(0.0'f32, worldMaxX - cameraHalfW)
-    halfFreeY = max(0.0'f32, worldMaxY - cameraHalfH)
-    targetX = clamp(target.fX, -halfFreeX, halfFreeX)
-    targetY = clamp(target.fY, -halfFreeY, halfFreeY)
-    alpha = 1.0'f32 - exp(-CameraLerpRate * deltaTime)
-
+    targetX = clamp((minX + maxX) * 0.5, -max(0.0'f32, worldMaxX - cameraHalfW),
+                    max(0.0'f32, worldMaxX - cameraHalfW))
+    targetY = clamp((minY + maxY) * 0.5, -max(0.0'f32, worldMaxY - cameraHalfH),
+                    max(0.0'f32, worldMaxY - cameraHalfH))
+  var cameraPosition: orxVECTOR
+  discard getPosition(mainCamera, addr cameraPosition)
   cameraPosition.fX += (targetX - cameraPosition.fX) * alpha
   cameraPosition.fY += (targetY - cameraPosition.fY) * alpha
 
@@ -250,9 +346,9 @@ proc runTestScript(deltaTime: float32) =
     return
 
   ## Due actions
-  while scenarioIndex < Scenario.len and
-      test.time >= Scenario[scenarioIndex].at:
-    let action = Scenario[scenarioIndex]
+  while scenarioIndex < testScenario.len and
+      test.time >= testScenario[scenarioIndex].at:
+    let action = testScenario[scenarioIndex]
     inc scenarioIndex
     case action.kind
     of taMove:
@@ -303,12 +399,27 @@ proc runTestScript(deltaTime: float32) =
       gs.collected = gs.needed
     of taTeleport:
       test.exitTeleported = true
-      discard world.playerObj().setWorldPosition(
-        world.cellWorld(action.cx, action.cy))
+      if action.player < world.players.len:
+        discard world.players[action.player].obj.setWorldPosition(
+          world.cellWorld(action.cx, action.cy))
+    of taKillPlayer:
+      world.killPlayer(action.player, "Test crush")
+    of taCheckRespawn:
+      if action.player < world.players.len:
+        let hero = world.players[action.player]
+        if hero.obj != nil:
+          let position = hero.obj.getWorldPosition()
+          let spawnPosition = world.cellWorld(hero.spawnX, hero.spawnY)
+          test.respawned[action.player] =
+            hypot(position.fX - spawnPosition.fX,
+                  position.fY - spawnPosition.fY) < 10.0
     of taScreenshot:
       discard screenshots.takeScreenshot()
     of taFinish:
-      runFinalChecks()
+      if test.mp:
+        runFinalChecksMp()
+      else:
+        runFinalChecks()
       test.finished = true
       setEnginePaused(false)
       discard eventSendShort(EVENT_TYPE_SYSTEM, SYSTEM_EVENT_CLOSE.orxU32)
@@ -360,6 +471,15 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
   contacts.processContacts()
 
   case gs.phase
+  of phModeSelect:
+    var joined = 1
+    for i in 1 ..< gs.maxPlayers:
+      if not joinedPlayers[i] and joinActivated(i):
+        joinedPlayers[i] = true
+        inc joined
+        ui.showSubMessage(&"PLAYER {i + 1} JOINED ({joined})", 1.5)
+    if hasBeenActivated("Confirm"):
+      startRun()
   of phIntro:
     gs.phaseTimer -= deltaTime
     if gs.phaseTimer <= 0.0:
@@ -544,10 +664,15 @@ proc init(): orxSTATUS {.cdecl.} =
   if pushSection("MainCamera").isSuccess:
     cameraHalfW = getFloat("FrustumWidth") * 0.5'f32
     cameraHalfH = getFloat("FrustumHeight") * 0.5'f32
+    cameraNear = getFloat("FrustumNear")
+    cameraFar = getFloat("FrustumFar")
     discard popSection()
   if cameraHalfW == 0.0:
     cameraHalfW = 640.0
     cameraHalfH = 360.0
+  if cameraFar <= cameraNear:
+    cameraNear = 0.0
+    cameraFar = 4.0
 
   if not ui.initUi():
     return STATUS_FAILURE
@@ -563,20 +688,28 @@ proc init(): orxSTATUS {.cdecl.} =
     return STATUS_FAILURE
 
   resetRun()
+  joinedPlayers[0] = true
+  if startupTest or startupTestMp:
+    gs.playerCount = (if startupTestMp: 2 else: 1)
+    testScenario = (if startupTestMp: ScenarioMp else: Scenario)
+    test = TestScript(active: true, mp: startupTestMp)
+    if not runConfigChecks():
+      return STATUS_FAILURE
   if not world.loadWorld(0):
     echo "Could not load the first level"
     return STATUS_FAILURE
   creatures.spawnPending()
-  showLevelIntro()
+  if startupTest or startupTestMp:
+    showLevelIntro()
+  else:
+    enterPhase(phModeSelect)
+    ui.showMessage("ROCKRUN - COOP MODE", 0.0)
+    ui.showSubMessage(
+      "1-4 players - move or press Start to join - Enter to play", 0.0)
 
   if registerContactHandler().isFailure:
     echo "Could not register the physics handler"
     return STATUS_FAILURE
-
-  if startupTest:
-    test = TestScript(active: true)
-    if not runConfigChecks():
-      return STATUS_FAILURE
 
   coreClock = clockGet(CLOCK_KZ_CORE)
   if coreClock == nil:
@@ -586,7 +719,7 @@ proc init(): orxSTATUS {.cdecl.} =
   initializationSucceeded = result.isSuccess
 
 proc run(): orxSTATUS {.cdecl.} =
-  if startupTest:
+  if startupTest or startupTestMp:
     inc startupFrames
     if startupFrames >= StartupTestFrameCount and not test.active:
       return STATUS_FAILURE
@@ -625,7 +758,7 @@ when isMainModule:
     quit("Could not register the bootstrap callback")
   execute(init, run, exit)
   if not initializationSucceeded or executionFailed or
-      (startupTest and test.failures.len > 0):
+      ((startupTest or startupTestMp) and test.failures.len > 0):
     quit(1)
   if startupTest and test.boulder == nil:
     quit(1)

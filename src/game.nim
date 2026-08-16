@@ -21,6 +21,10 @@ const
   InvulnTime* = 2.5'f32
   ## Camera smoothing rate for the exponentially damped follow.
   CameraLerpRate* = 7.0'f32
+  ## Padding around the hero group the camera keeps on screen (px).
+  CameraMargin* = 240.0'f32
+  ## Maximum camera zoom-out factor (1.0 = base frustum).
+  CameraMaxZoom* = 2.5'f32
   ## Analog stick dead zone.
   Deadzone* = 0.28'f32
   ## Sound rate limits in seconds.
@@ -59,6 +63,8 @@ type
     exitOpen*: bool
     dirtDug*: int
     timeExpired*: bool ## clock hit zero; alive heroes die once
+    runLives*: array[4, int] ## per-hero lives across the whole run
+    runDown*: array[4, bool] ## per-hero out-of-lives state
     lastThud*: float32
     lastClink*: float32
     lastPush*: float32
@@ -79,6 +85,9 @@ proc resetRun*() =
   gs.levelCompleted = false
   gs.timeExpired = false
   gs.worldClockTime = 0.0
+  for i in 0 ..< 4:
+    gs.runLives[i] = gs.livesStart
+    gs.runDown[i] = false
 
 proc enterPhase*(phase: Phase) =
   ## Enters a phase and initializes its timer.
