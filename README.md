@@ -162,9 +162,23 @@ vagrant --version && vboxmanage --version
 ```
 
 Then, once per machine: `vagrant up` boots the Windows 10 box (first run
-downloads ~5 GB) and `C:\vagrant\scripts\windows-setup.bat` must be run
-as Administrator inside the VM window. Afterwards `./makewindows.sh`
-builds orx.dll + rockrun.exe and packs the zip in one go.
+downloads ~5 GB). In the VirtualBox window, click **Show** on the running
+VM, log in (`vagrant` / `vagrant`), start a **Command Prompt as
+Administrator** and run:
+
+```bat
+cd C:\vagrant\scripts
+windows-setup.bat
+```
+
+This installs Chocolatey, Git, Nim and MinGW. Practical notes:
+- If the first run stops early (e.g. at the Chocolatey step), just run it
+  again - a second run continues with the remaining installs.
+- Git/Nim may not be on the PATH for the automated WinRM sessions used by
+  the build scripts; those scripts add the tools explicitly.
+
+Afterwards `./makewindows.sh` builds orx.dll + rockrun.exe and packs the
+zip in one go.
 
 ### Installing appimagetool (Ubuntu)
 
