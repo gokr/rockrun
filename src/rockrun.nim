@@ -35,6 +35,7 @@ type
     taSpawnGem
     taSpawnCreature
     taExplodeCreature
+    taCheckBoulder
     taFakeQuota
     taTeleport
     taScreenshot
@@ -55,6 +56,7 @@ type
     time: float32
     boulder: ptr orxOBJECT
     boulderSpawnY: float32
+    boulderFellBy: float32
     spawnedCreature: ptr orxOBJECT
     explodedGemCount: int
     collectedBeforeExit: int
@@ -79,6 +81,7 @@ const
                cx: 31, cy: 14),
     TestAction(at: 6.5, kind: taExplodeCreature),
     TestAction(at: 8.0, kind: taScreenshot),
+    TestAction(at: 8.0, kind: taCheckBoulder),
     TestAction(at: 8.0, kind: taFakeQuota),
     TestAction(at: 8.0, kind: taTeleport, cx: 35, cy: 19),
     TestAction(at: 8.0, kind: taMove, dx: 1.0, dy: 0.0, duration: 4.0),
@@ -106,11 +109,8 @@ proc testCheck(condition: bool; message: string) =
     echo "Rockrun test failed: ", message
 
 proc runFinalChecks() =
-  testCheck(test.boulder != nil, "startup boulder was not spawned")
-  if test.boulder != nil:
-    let fellBy = test.boulder.getWorldPosition().fY - test.boulderSpawnY
-    testCheck(fellBy > 100.0,
-      fmt"startup boulder fell only {fellBy:.1} units")
+  testCheck(test.boulderFellBy > 100.0,
+    fmt"startup boulder fell only {test.boulderFellBy:.1} units")
   testCheck(gs.dirtDug >= 6,
     fmt"player dug only {gs.dirtDug} sand blocks")
   testCheck(test.collectedBeforeExit >= 1,
@@ -275,6 +275,15 @@ proc runTestScript(deltaTime: float32) =
       test.boulder = world.spawnBoulderAt(action.cx, action.cy)
       if test.boulder != nil:
         test.boulderSpawnY = test.boulder.getWorldPosition().fY
+    of taCheckBoulder:
+      ## Gravity drop check - must run while the boulder still exists
+      ## (the completion flow reloads the level and destroys it).
+      testCheck(test.boulder != nil, "startup boulder was not spawned")
+      if test.boulder != nil:
+        test.boulderFellBy =
+          test.boulder.getWorldPosition().fY - test.boulderSpawnY
+      testCheck(test.boulderFellBy > 100.0,
+        fmt"startup boulder fell only {test.boulderFellBy:.1} units")
     of taSpawnGem:
       ## Drops a diamond right in front of the player, inside the corridor
       ## that has already been dug (spawning inside solid sand would eject
@@ -370,6 +379,9 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
       setEnginePaused(false)
       enterPhase(phPlaying)
       ui.hideMessages()
+
+  if hasBeenActivated("ToggleFullScreen"):
+    discard setFullScreen(not isFullScreen().bool)
 
   if hasBeenActivated("Restart"):
     if gs.phase in {phGameOver, phAllComplete}:
@@ -485,8 +497,8 @@ proc runConfigChecks(): bool =
     return false
 
   for section in ["Player", "BoulderSmall", "Boulder", "BoulderBig",
-                  "Diamond", "Sand32", "SandFine", "Wall", "Exit",
-                  "DustPuff", "GemSparkle", "AudioSource"]:
+                  "BoulderHuge", "Diamond", "Sand32", "SandFine", "Wall",
+                  "Exit", "DustPuff", "GemSparkle", "AudioSource"]:
     let testObject = objectCreateFromConfig(section)
     if testObject == nil:
       echo "Startup check failed: could not create object ", section

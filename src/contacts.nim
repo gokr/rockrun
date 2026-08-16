@@ -140,6 +140,12 @@ proc processContact(contact: Contact) =
         gs.worldClockTime - gs.lastThud >= ThudInterval:
       gs.lastThud = gs.worldClockTime
       discard boulder.addSound("LandSound")
+    # A resting or falling boulder pressing on fine sand makes those
+    # grains give way (static -> dynamic for the touched column).
+    let sand = if firstKind == kDirt: contact.first
+               else: contact.second
+    if objectKind(sand).startsWith("SandFine"):
+      world.activateGrainColumn(sand)
 
   elif pair == {kDiamond, kDirt} or pair == {kDiamond, kWall} or
       pair == {kDiamond, kBoulder} or pair == {kDiamond, kDiamond}:

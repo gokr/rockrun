@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- More boulders in all three caves (24/38/47) with extra placement bands;
-  cave 1 keeps its startup-test corridor clear of falling rocks.
+- Five caves now (First Descent stays a simple tutorial, Rolling Fields
+  and Deep Vault got much denser boulder fields, plus two new caves:
+  Rumbling Depths and The Final Chamber).
+- New huge boulder size ('R') that crushes harder and jams tunnels.
+- Loose sand: refined 8px grains stay static until a boulder presses on
+  them, then the touched grain column turns dynamic and gives way - dig
+  too close under a boulder and the thin dirt collapses.
+- Fullscreen toggle (F key).
 
 ## [0.3.2] - 2026-08-16
 
