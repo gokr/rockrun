@@ -32,6 +32,7 @@ type
   TestActionKind* = enum
     taMove
     taSpawnBoulder
+    taBoulderFell
     taSpawnGem
     taSpawnCreature
     taExplodeCreature
@@ -44,6 +45,7 @@ type
     ## One scripted scenario step, executed when test.time reaches `at`.
     at*: float32
     kind*: TestActionKind
+    player*: int ## player index for per-player actions (default 0)
     dx*, dy*: float32
     duration*: float32
     cx*, cy*: int
@@ -55,11 +57,12 @@ type
     time: float32
     boulder: ptr orxOBJECT
     boulderSpawnY: float32
+    boulderFellBy: float32 ## captured while the boulder is still alive
     spawnedCreature: ptr orxOBJECT
     explodedGemCount: int
     collectedBeforeExit: int
     creatureSpawns: seq[orxVECTOR]
-    moveUntil: float32
+    moveUntil: array[4, float32]
     exitTeleported: bool
     completed: bool
     finished: bool
@@ -72,6 +75,7 @@ const
     TestAction(at: 1.0, kind: taSpawnBoulder, cx: 30, cy: 2),
     TestAction(at: 1.2, kind: taMove, dx: 1.0, dy: 0.0, duration: 6.3),
     TestAction(at: 2.5, kind: taSpawnGem, cx: 14, cy: 2),
+    TestAction(at: 3.0, kind: taBoulderFell),
     TestAction(at: 3.0, kind: taScreenshot),
     TestAction(at: 6.5, kind: taSpawnCreature, config: "Firefly",
                cx: 31, cy: 14),
@@ -105,10 +109,8 @@ proc testCheck(condition: bool; message: string) =
 
 proc runFinalChecks() =
   testCheck(test.boulder != nil, "startup boulder was not spawned")
-  if test.boulder != nil:
-    let fellBy = test.boulder.getWorldPosition().fY - test.boulderSpawnY
-    testCheck(fellBy > 100.0,
-      fmt"startup boulder fell only {fellBy:.1} units")
+  testCheck(test.boulderFellBy > 100.0,
+    fmt"startup boulder fell only {test.boulderFellBy:.1} units")
   testCheck(gs.dirtDug >= 6,
     fmt"player dug only {gs.dirtDug} sand blocks")
   testCheck(test.collectedBeforeExit >= 1,
@@ -269,12 +271,18 @@ proc runTestScript(deltaTime: float32) =
     inc scenarioIndex
     case action.kind
     of taMove:
-      movement.movementOverride = some((action.dx, action.dy))
-      test.moveUntil = test.time + action.duration
+      movement.movementOverride[action.player] = some((action.dx, action.dy))
+      test.moveUntil[action.player] = test.time + action.duration
     of taSpawnBoulder:
       test.boulder = world.spawnBoulderAt(action.cx, action.cy)
       if test.boulder != nil:
         test.boulderSpawnY = test.boulder.getWorldPosition().fY
+    of taBoulderFell:
+      ## Captured while the boulder is still alive: reading the object
+      ## after a level reload would dereference a stale pointer.
+      if test.boulder != nil:
+        test.boulderFellBy =
+          test.boulder.getWorldPosition().fY - test.boulderSpawnY
     of taSpawnGem:
       ## Drops a diamond right in front of the player, inside the corridor
       ## that has already been dug (spawning inside solid sand would eject
@@ -321,15 +329,18 @@ proc runTestScript(deltaTime: float32) =
       discard eventSendShort(EVENT_TYPE_SYSTEM, SYSTEM_EVENT_CLOSE.orxU32)
 
   ## Movement override lifetime
-  if movement.movementOverride.isSome and test.time >= test.moveUntil and
-      not test.completed:
-    movement.movementOverride = options.none(tuple[x, y: float32])
+  for playerIndex in 0 ..< 4:
+    if movement.movementOverride[playerIndex].isSome and
+        test.time >= test.moveUntil[playerIndex] and
+        not test.completed:
+      movement.movementOverride[playerIndex] =
+        options.none((float32, float32))
 
   ## Completion detection while walking into the exit
   if test.exitTeleported and not test.completed and
       (gs.levelCompleted or gs.phase == phComplete):
     test.completed = true
-    movement.movementOverride = options.none(tuple[x, y: float32])
+    movement.movementOverride[0] = options.none((float32, float32))
 
 proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
   if isActive("Quit"):
@@ -361,7 +372,6 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
   if hasBeenActivated("TakeScreenshot"):
     discard screenshots.takeScreenshot()
 
-  world.clearDestroyed()
   contacts.processContacts()
 
   case gs.phase
@@ -420,6 +430,10 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
   if test.active:
     runTestScript(deltaTime)
 
+  ## End of frame: release objects destroyed during it (see
+  ## world.destroyObject for why deletion is deferred).
+  world.flushDestroyed()
+
 proc checkInputBindings(): bool =
   ## Verifies both keyboard and controller bindings from config.
   type Expected = tuple[action: string; expectedType: orxINPUT_TYPE;
@@ -438,7 +452,27 @@ proc checkInputBindings(): bool =
     (action: "MoveXAxis", expectedType: INPUT_TYPE_JOYSTICK_AXIS,
      expectedId: ord(JOYSTICK_AXIS_LX_1).orxENUM),
     (action: "MoveYAxis", expectedType: INPUT_TYPE_JOYSTICK_AXIS,
-     expectedId: ord(JOYSTICK_AXIS_LY_1).orxENUM)
+     expectedId: ord(JOYSTICK_AXIS_LY_1).orxENUM),
+    (action: "MoveLeftP2", expectedType: INPUT_TYPE_KEYBOARD_KEY,
+     expectedId: ord(KEYBOARD_KEY_LEFT).orxENUM),
+    (action: "MoveLeftP2", expectedType: INPUT_TYPE_JOYSTICK_BUTTON,
+     expectedId: ord(JOYSTICK_BUTTON_LEFT_2).orxENUM),
+    (action: "MoveXAxisP2", expectedType: INPUT_TYPE_JOYSTICK_AXIS,
+     expectedId: ord(JOYSTICK_AXIS_LX_2).orxENUM),
+    (action: "JoinP2", expectedType: INPUT_TYPE_JOYSTICK_BUTTON,
+     expectedId: ord(JOYSTICK_BUTTON_START_2).orxENUM),
+    (action: "MoveLeftP3", expectedType: INPUT_TYPE_KEYBOARD_KEY,
+     expectedId: ord(KEYBOARD_KEY_J).orxENUM),
+    (action: "MoveXAxisP3", expectedType: INPUT_TYPE_JOYSTICK_AXIS,
+     expectedId: ord(JOYSTICK_AXIS_LX_3).orxENUM),
+    (action: "JoinP3", expectedType: INPUT_TYPE_JOYSTICK_BUTTON,
+     expectedId: ord(JOYSTICK_BUTTON_START_3).orxENUM),
+    (action: "MoveLeftP4", expectedType: INPUT_TYPE_KEYBOARD_KEY,
+     expectedId: ord(KEYBOARD_KEY_NUMPAD_4).orxENUM),
+    (action: "MoveXAxisP4", expectedType: INPUT_TYPE_JOYSTICK_AXIS,
+     expectedId: ord(JOYSTICK_AXIS_LX_4).orxENUM),
+    (action: "JoinP4", expectedType: INPUT_TYPE_JOYSTICK_BUTTON,
+     expectedId: ord(JOYSTICK_BUTTON_START_4).orxENUM)
   ]
   for expectation in expectations:
     var
@@ -465,7 +499,8 @@ proc runConfigChecks(): bool =
   if not checkInputBindings():
     return false
 
-  for section in ["Player", "BoulderSmall", "Boulder", "BoulderBig",
+  for section in ["Player", "Player2", "Player3", "Player4",
+                  "BoulderSmall", "Boulder", "BoulderBig",
                   "Diamond", "Sand32", "SandFine", "Wall", "Exit",
                   "DustPuff", "GemSparkle", "AudioSource"]:
     let testObject = objectCreateFromConfig(section)
@@ -501,10 +536,14 @@ proc init(): orxSTATUS {.cdecl.} =
   if pushSection("Game").isSuccess:
     gs.levelCount = getS32("LevelCount").int
     gs.livesStart = getS32("Lives").int
+    gs.maxPlayers = getS32("MaxPlayers").int
     gs.diamondScore = getS32("DiamondScore").int
     gs.digScore = getS32("DigScore").int
     gs.timeBonusPerSecond = getS32("TimeBonusPerSecond").int
     discard popSection()
+  if gs.maxPlayers < 1 or gs.maxPlayers > 4:
+    gs.maxPlayers = 4
+  gs.playerCount = 1
 
   mainViewport = viewportCreateFromConfig("MainViewport")
   if mainViewport == nil:

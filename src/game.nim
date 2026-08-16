@@ -17,6 +17,8 @@ const
   IntroTime* = 1.7'f32
   DyingTime* = 1.6'f32
   CompleteTime* = 2.2'f32
+  ## Respawn invulnerability window in seconds.
+  InvulnTime* = 2.5'f32
   ## Camera smoothing rate for the exponentially damped follow.
   CameraLerpRate* = 7.0'f32
   ## Analog stick dead zone.
@@ -28,6 +30,7 @@ const
 
 type
   Phase* = enum
+    phModeSelect
     phIntro
     phPlaying
     phPaused
@@ -39,6 +42,8 @@ type
   Game* = object
     phase*: Phase
     phaseTimer*: float32
+    playerCount*: int
+    maxPlayers*: int
     score*: int
     lives*: int
     livesStart*: int

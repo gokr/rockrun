@@ -13,8 +13,8 @@ import game
 import world
 
 var
-  movementOverride*: Option[tuple[x, y: float32]]
-  ## When set (startup test), replaces live input for all players.
+  movementOverride*: array[4, Option[(float32, float32)]]
+  ## When set (startup test), replaces live input for that player.
   animSawDig* = false
   ## Set when the dig swing animation has been triggered at least once.
 
@@ -36,8 +36,9 @@ proc clampAxis(value: float32): float32 =
 
 proc inputDirection*(player: Player): tuple[x, y: float32] =
   ## Combined direction from d-pad/keys and the analog stick for one hero.
-  if movementOverride.isSome:
-    return movementOverride.get
+  if player.index >= 0 and player.index < movementOverride.len and
+      movementOverride[player.index].isSome:
+    return movementOverride[player.index].get
 
   var
     dx, dy: float32
@@ -80,6 +81,9 @@ proc playAnim(player: var Player; animName: string) =
 proc updatePlayer*(player: var Player; deltaTime: float32) =
   ## Applies movement, digging, animation and push feedback for one hero.
   if player.obj == nil or gs.phase != phPlaying:
+    return
+  if player.respawnTimer > 0.0:
+    # Corpse: waits out the respawn delay at the death spot.
     return
 
   let (dx, dy) = inputDirection(player)

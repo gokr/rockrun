@@ -52,6 +52,7 @@ type
     currentAnim*: string
     digAnimTimer*: float32
     digFlip*: bool
+    down*: bool ## out of lives for the run (spectating)
 
 const
   ## Sub-grid size per cell (4x4) and block size in pixels.
@@ -88,6 +89,7 @@ var
 
 var
   destroyedObjects: HashSet[pointer]
+  pendingDeletes: seq[ptr orxOBJECT]
   dugThisFrame*: int
   ## Number of fine sand blocks actually dug out during the current frame
   ## (reset by the caller; used to trigger the dig animation).
@@ -174,15 +176,26 @@ proc removeTracked(gameObject: ptr orxOBJECT) =
       tracking[].delete(index)
 
 proc destroyObject*(gameObject: ptr orxOBJECT) =
+  ## Marks an object destroyed: untracked immediately, removed from the
+  ## physics world at end of frame. The actual `objectDelete` is deferred
+  ## so addresses of freshly created objects can never alias objects
+  ## destroyed earlier in the same frame (pointer-reuse false positives
+  ## on the tombstone set).
   if gameObject == nil:
+    return
+  if cast[pointer](gameObject) in destroyedObjects:
     return
   removeTracked(gameObject)
   destroyedObjects.incl(cast[pointer](gameObject))
-  discard objectDelete(gameObject)
+  pendingDeletes.add(gameObject)
 
-proc clearDestroyed*() =
-  ## Starts a fresh destruction cycle; called once per frame before the
-  ## contact queue is drained.
+proc flushDestroyed*() =
+  ## End-of-frame: deletes objects marked during the frame and clears the
+  ## tombstone set. Called once per frame, after the contact queue has
+  ## been drained and game logic has run.
+  for gameObject in pendingDeletes:
+    discard objectDelete(gameObject)
+  pendingDeletes.setLen(0)
   destroyedObjects.clear()
 
 proc isDestroyed*(gameObject: ptr orxOBJECT): bool =
@@ -349,9 +362,16 @@ proc clearWorld*() =
   playerSpawns.setLen(0)
 
 proc spawnPlayers*(): bool =
-  ## Instantiates one hero object per spawn point in `playerSpawns`.
-  for index, spawnPoint in playerSpawns:
-    let hero = objectCreateFromConfig("Player")
+  ## Instantiates one hero object per joined player (`gs.playerCount`)
+  ## using the first spawn points of the level.
+  if playerSpawns.len < gs.playerCount:
+    echo "Level has ", playerSpawns.len, " spawns for ",
+         gs.playerCount, " players"
+    return false
+  for index in 0 ..< gs.playerCount:
+    let spawnPoint = playerSpawns[index]
+    let hero = objectCreateFromConfig(
+      (if index == 0: "Player" else: "Player" & $(index + 1)))
     if hero == nil:
       echo "Could not create the player"
       return false
@@ -364,7 +384,8 @@ proc spawnPlayers*(): bool =
       index: index,
       inputSet: (if index == 0: "P1" else: "P" & $(index + 1)),
       spawnX: spawnPoint.x,
-      spawnY: spawnPoint.y))
+      spawnY: spawnPoint.y,
+      lives: gs.livesStart))
   result = true
 
 proc buildWorld(level: LevelDef): bool =
@@ -431,7 +452,7 @@ proc buildWorld(level: LevelDef): bool =
       of 'f', 'b':
         pendingCreatures.add((config: (if symbol == 'f': "Firefly"
                                        else: "Butterfly"), x: x, y: y))
-      of '@':
+      of '@', '2', '3', '4':
         playerSpawns.add((x: x, y: y))
         inc playerCount
       of ' ':
@@ -440,8 +461,8 @@ proc buildWorld(level: LevelDef): bool =
         echo "Unknown level symbol '", symbol, "' at ", x, ",", y
         return false
 
-  if playerCount != 1 or exitCount != 1:
-    echo "Levels need exactly one player and one exit, got ",
+  if playerCount < 1 or playerCount > 4 or exitCount != 1:
+    echo "Levels need 1-4 player spawns and one exit, got ",
          playerCount, " and ", exitCount
     return false
   if gs.gemTotal < level.needed:
@@ -476,11 +497,11 @@ proc validateLevels*(): bool =
       echo "Startup check failed: reading level ", i + 1
       return false
 
-    var players, exits, gemCount = 0
+    var spawnCount, exits, gemCount = 0
     for row in level.rows:
       for symbol in row:
         case symbol
-        of '@': inc players
+        of '@', '2', '3', '4': inc spawnCount
         of 'E': inc exits
         of 'D': inc gemCount
         of ' ', '#', '.', 'o', 'O', 'Q', 'f', 'b': discard
@@ -488,7 +509,8 @@ proc validateLevels*(): bool =
           echo "Startup check failed: unknown symbol '", symbol,
                "' in level ", i + 1
           return false
-    if players != 1 or exits != 1 or gemCount < level.needed:
+    if spawnCount < 1 or spawnCount > 4 or exits != 1 or
+        gemCount < level.needed:
       echo "Startup check failed: invalid counts in level ", i + 1
       return false
   result = true
