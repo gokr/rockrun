@@ -54,70 +54,76 @@ if "%EXTERN_VER%"=="" (
     exit /b 1
 )
 
-:: Fetch the extern zip into the cache (setup.r's own cache location).
-:: The primary host (orx-project.org) is currently down - use the
-:: codeload fallback first, mirroring setup.r's host list.
-if not exist "cache\%EXTERN_VER%.zip" (
-    echo Downloading ORX extern %EXTERN_VER%...
-    mkdir cache 2>nul
-    curl -f -L -o "cache\%EXTERN_VER%.zip" "https://codeload.github.com/orx/orx-extern/zip/%EXTERN_VER%"
-    if %errorLevel% neq 0 (
-        echo Retrying primary host...
-        curl -f -L -o "cache\%EXTERN_VER%.zip" "https://orx-project.org/extern/%EXTERN_VER%.zip"
+:: Generate the gmake files only when they are missing (previous
+:: half-finished attempts may leave a partial extern/ around).
+if not exist "code\build\windows\gmake\Makefile" (
+    echo Generating ORX gmake build files...
+
+    :: Fetch the extern zip into the cache (setup.r's own cache location).
+    :: The primary host (orx-project.org) is currently down - use the
+    :: codeload fallback first, mirroring setup.r's host list.
+    if not exist "cache\%EXTERN_VER%.zip" (
+        echo Downloading ORX extern %EXTERN_VER%...
+        mkdir cache 2>nul
+        curl -f -L -o "cache\%EXTERN_VER%.zip" "https://codeload.github.com/orx/orx-extern/zip/%EXTERN_VER%"
+        if %errorLevel% neq 0 (
+            echo Retrying primary host...
+            curl -f -L -o "cache\%EXTERN_VER%.zip" "https://orx-project.org/extern/%EXTERN_VER%.zip"
+        )
+        if %errorLevel% neq 0 (
+            echo ERROR: failed to download ORX extern zip
+            pause
+            exit /b 1
+        )
+    ) else (
+        echo ORX extern %EXTERN_VER% found in cache.
     )
+
+    :: Extract the extern dir; verify the premake we need actually made it.
+    if not exist "extern\premake\bin\windows\premake4.exe" (
+        echo Extracting ORX extern...
+        if exist extern rd /s /q extern
+        mkdir extern
+        tar -xf "cache\%EXTERN_VER%.zip" -C extern --strip-components=1
+        if not exist "extern\premake\bin\windows\premake4.exe" (
+            echo ERROR: premake4.exe missing after extraction - bad zip?
+            echo Deleting the cache zip so the next run re-downloads.
+            del "cache\%EXTERN_VER%.zip" 2>nul
+            pause
+            exit /b 1
+        )
+    ) else (
+        echo ORX extern already extracted.
+    )
+
+    :: MinGW runtime: premake4.exe and mingw32-make are MinGW binaries
+    :: that need libwinpthread/libstdc++/libgcc DLLs. Self-heal in case
+    :: windows-setup.bat's mingw step did not run.
+    where mingw32-make >nul 2>&1
     if %errorLevel% neq 0 (
-        echo ERROR: failed to download ORX extern zip
+        echo Installing MinGW via Chocolatey...
+        choco install mingw -y --no-progress
+        if %errorLevel% neq 0 (
+            echo ERROR: failed to install MinGW
+            pause
+            exit /b 1
+        )
+    )
+    set "PATH=%ALLUSERSPROFILE%\chocolatey\lib\mingw\tools\install\mingw64\bin;%PATH%"
+
+    :: Copy the Windows premake into code/build and generate
+    copy /y "extern\premake\bin\windows\premake4.exe" "code\build\premake4.exe" >nul
+    cd /d "code\build"
+    premake4.exe gmake
+    if %errorLevel% neq 0 (
+        echo ERROR: premake failed to generate build files
         pause
         exit /b 1
     )
-) else (
-    echo ORX extern %EXTERN_VER% found in cache.
-)
-
-:: Extract the extern dir (premake and friends)
-if not exist "extern" (
-    echo Extracting ORX extern...
-    mkdir extern
-    tar -xf "cache\%EXTERN_VER%.zip" -C extern --strip-components=1
-    if %errorLevel% neq 0 (
-        echo ERROR: failed to extract ORX extern
-        pause
-        exit /b 1
-    )
-) else (
-    echo ORX extern already extracted.
-)
-
-:: Copy the Windows premake into code/build
-copy /y "extern\premake\bin\windows\premake4.exe" "code\build\premake4.exe" >nul
-
-:: MinGW runtime: premake4.exe and mingw32-make are MinGW binaries that
-:: need libwinpthread/libstdc++/libgcc DLLs. Ensure MinGW is installed
-:: (self-healing, in case windows-setup.bat's mingw step did not run).
-where mingw32-make >nul 2>&1
-if %errorLevel% neq 0 (
-    echo Installing MinGW via Chocolatey...
-    choco install mingw -y --no-progress
-    if %errorLevel% neq 0 (
-        echo ERROR: failed to install MinGW
-        pause
-        exit /b 1
-    )
-)
-set "PATH=%ALLUSERSPROFILE%\chocolatey\lib\mingw\tools\install\mingw64\bin;%PATH%"
-
-:: Generate the gmake build files
-echo Generating ORX gmake build files...
-cd /d "code\build"
-premake4.exe gmake
-if %errorLevel% neq 0 (
-    echo ERROR: premake failed to generate build files
-    pause
-    exit /b 1
 )
 
 :: Build
-cd /d "windows\gmake"
+cd /d "code\build\windows\gmake"
 mingw32-make config=release64
 if %errorLevel% neq 0 (
     echo ERROR: ORX release64 build failed
