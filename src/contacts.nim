@@ -16,6 +16,7 @@ type
     first: ptr orxOBJECT
     second: ptr orxOBJECT
     position: orxVECTOR
+    normal: orxVECTOR
 
   ObjKind = enum
     kOther
@@ -46,8 +47,9 @@ proc physicsEventHandler(event: ptr orxEVENT): orxSTATUS {.cdecl.} =
     return STATUS_SUCCESS
   var contact = Contact(first: recipient, second: sender)
   if event.pstPayload != nil:
-    contact.position =
-      cast[ptr orxPHYSICS_EVENT_PAYLOAD](event.pstPayload).vPosition
+    let payload = cast[ptr orxPHYSICS_EVENT_PAYLOAD](event.pstPayload)
+    contact.position = payload.vPosition
+    contact.normal = payload.vNormal
   pendingContacts.add(contact)
   result = STATUS_SUCCESS
 
@@ -86,6 +88,15 @@ proc killHero(heroObj: ptr orxOBJECT; reason: string) =
       let hero = world.players[index]
       ui.showSubMessage(
         (if hero.down: "OUT OF LIVES" else: &"LIVES {hero.lives}"), 1.6)
+
+proc closingMomentum(boulder: ptr orxOBJECT; normal: orxVECTOR): float32 =
+  ## The boulder's momentum along the contact normal - the component of
+  ## its velocity that actually presses into the other body. A boulder
+  ## falling straight onto a head has the full vertical momentum; one
+  ## grazing past the side has (almost) none.
+  let speed = boulder.getSpeed()
+  result = boulder.getMass() *
+    abs(speed.fX * normal.fX + speed.fY * normal.fY)
 
 proc processContact(contact: Contact) =
   if gs.phase != phPlaying:
@@ -129,7 +140,7 @@ proc processContact(contact: Contact) =
                 else: contact.second
       heroObj = if firstKind == kPlayer: contact.first
                 else: contact.second
-    if boulder.getMass() * boulder.getSpeed().fY > CrushMomentum:
+    if closingMomentum(boulder, contact.normal) > CrushMomentum:
       killHero(heroObj, "Crushed by a boulder")
     elif impactSpeed(boulder) > ThudMinSpeed and
         gs.worldClockTime - gs.lastThud >= ThudInterval:
@@ -162,7 +173,7 @@ proc processContact(contact: Contact) =
                 else: contact.second
       creatureObj = if firstKind == kCreature: contact.first
                     else: contact.second
-    if boulder.getMass() * boulder.getSpeed().fY > CrushMomentum:
+    if closingMomentum(boulder, contact.normal) > CrushMomentum:
       creatures.explodeCreature(creatureObj)
 
   elif pair == {kBoulder, kDirt} or pair == {kBoulder, kWall} or

@@ -62,6 +62,9 @@ Local co-op multiplayer.
 - Boulder crush is now momentum-based (mass x fall speed) instead of
   plain speed: a huge boulder crushes from a small drop, a pebble needs
   a long fall - size now matters for "brutal" rocks.
+- Crush impact direction: the boulder's momentum is projected on the
+  contact normal, so a rock falling straight onto your head crushes,
+  while one grazing past your side does not.
 - Countdown beats are all equal (0.5s); the first beat used to be 1.5s
   and the "3" text vanished mid-beat, leaving a blank pause.
 
