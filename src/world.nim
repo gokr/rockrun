@@ -557,12 +557,14 @@ proc spawnPlayers*(): bool =
     if hero == nil:
       echo "Could not create the player"
       return false
-    # Config tint, normalized to 0..1. Explicitly applied (and re-applied
-    # at respawn): ORX FX tracks can leave the object color modified.
-    var heroColor = newVector(1.0, 1.0, 1.0)
+    # Config tint, re-applied at spawn and respawn. Must use ORX's
+    # COMPONENT colorspace (raw 0..255) - the same read the object
+    # creation path uses; COLORSPACE_RGB normalizes to 0..1 and writing
+    # that into the raw field garbles the render.
+    var heroColor = newVector(255.0, 255.0, 255.0)
     if pushSection(configName).isSuccess:
       if hasValue("Color") == orxTRUE:
-        discard getColorVector("Color", COLORSPACE_RGB, addr heroColor)
+        discard getColorVector("Color", COLORSPACE_COMPONENT, addr heroColor)
       discard popSection()
     discard setRGB(hero, addr heroColor)
     let position = cellWorld(spawnPoint.x, spawnPoint.y)
