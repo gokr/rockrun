@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Local co-op for 1-4 players: lobby join (movement keys or controller
+  Start), per-player lives with respawn + invulnerability, shared diamond
+  quota, group camera with zoom-out, `--startup-test-mp` scenario.
+
 ### Changed
 
 - The single hero is now a `Player` record in `world.players` (physics
-  object, spawn point, input set, animation state per player) — the
-  foundation for local multiplayer; no behavior change.
+  object, spawn point, input set, animation state per player).
+- Object destruction is deferred to end of frame (`flushDestroyed`) so
+  newly created objects can never alias same-frame destroyed addresses.
 
 ## [0.3.2] - 2026-08-16
 

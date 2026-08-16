@@ -52,6 +52,7 @@ writes screenshots to `./screenshots/`):
 ```bash
 nimble test
 # or: ./rockrun -c test.ini --startup-test true
+# multiplayer variant: ./rockrun -c test.ini --startup-test-mp true
 ```
 
 Never run the test WITHOUT `-c test.ini`: with VSync on, compositor throttling
@@ -104,6 +105,19 @@ Also re-generate levels after changing `tools/genlevels.py`:
 - Core clock runs at ~display frequency (240Hz on the dev host) with dt
   clamp — scripted tests use a dt multiplier (`TestClockMultiplier`) instead
   of waiting real seconds.
+
+## Gameplay / multiplayer notes
+
+- Lobby (`phModeSelect`) joins players by movement keys or controller
+  Start (`JoinP2..4`); Enter starts with the joined count.
+- Co-op: shared diamond quota, any player can finish the cave; per-player
+  lives respawn at the spawn cell with invulnerability (no cave reload);
+  run lives persist across caves (`gs.runLives`).
+- Heroes are `Player` records: spawn cell, input set, animation state,
+  lives, respawn/invulnerability timers. Players don't collide with each
+  other (PlayerPart `CheckMask 0xFFFE`).
+- Camera frames the active hero group: centroid follow with zoom-out
+  (`orxCamera_SetFrustum`), never zooms in.
 
 ## Coding style
 

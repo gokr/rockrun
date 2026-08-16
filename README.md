@@ -19,6 +19,11 @@ diamonds to open the exit, and get out before the clock or a boulder gets you.
 - **A proper hero** — the player is a dynamic body with custom zero gravity
   (classic BD free movement) you steer through the cave with analog
   precision, animated with idle/run/dig sprite cycles (Kenney adventurer).
+- **Local co-op for 1-4 players** — join in the lobby with a movement key
+  or a controller's Start button, dig as a team towards a shared diamond
+  quota, and finish the cave together. Dying costs a life and respawns you
+  at your spawn point with brief invulnerability; with zero lives you
+  spectate. The camera zooms out to frame everyone.
 - **Fireflies and butterflies** — classic wall huggers. Fireflies keep the
   wall on their left, butterflies on their right, they move between cells
   with deterministic turning decisions, kill you on touch, and a boulder
@@ -47,21 +52,41 @@ diamonds to open the exit, and get out before the clock or a boulder gets you.
 - **Background music** — an 8-bit dungeon chiptune that loops while you dig.
 - **HUD** — score, required gem quota, countdown timer, lives and cave name,
   rendered by a dedicated screen-aligned viewport sitting on top of the cave.
-- **Lives, time bonus, run restart** — three lives per run, score persists
-  across caves, remaining time converts to bonus points on completion.
+- **Lives, time bonus, run restart** — three lives per run (per player),
+  score persists across caves, remaining time converts to bonus points on
+  completion.
 - **Screenshots** — press `H` (or left-stick press) anytime; PNGs land in
   `screenshots/`.
 
+## Multiplayer
+
+Up to four heroes share one cave in **co-op** mode (a competitive race
+mode is planned). The lobby accepts joins from any movement key or a
+controller's Start button; Enter starts the run with the joined players.
+The team mines a shared diamond quota — the exit opens once the *team*
+count is met and any player can finish the cave. Deaths are personal:
+respawn at your spawn point with a short invulnerability window, and the
+cave is never reloaded while teammates are still in the fight. When every
+player is out of lives, the run ends.
+
+Levels carry four spawn points (`@` for P1 plus `2`/`3`/`4`); heroes are
+tinted per player (green/blue/yellow). The camera centers on the group and
+zooms out (up to 2.5×) to keep everyone on screen.
+
 ## Controls
 
-| Action        | Keyboard            | Controller                |
-|---------------|---------------------|---------------------------|
-| Move          | WASD / arrow keys   | d-pad / left analog stick |
-| Pause         | Space               | Start |                   |
-| Retry cave    | R                   | Y                         |
-| Confirm       | Enter               | A                         |
-| Screenshot    | H                   | LThumb                    |
-| Quit          | Esc                 | Back                      |
+| Action        | Keyboard                        | Controller                |
+|---------------|---------------------------------|---------------------------|
+| P1 move       | WASD                            | controller 1 d-pad/stick  |
+| P2 move       | arrow keys                      | controller 2 d-pad/stick  |
+| P3 move       | IJKL                             | controller 3 d-pad/stick  |
+| P4 move       | numpad 4/6/8/5                   | controller 4 d-pad/stick  |
+| Pause         | Space                           | Start (P1)                |
+| Retry cave    | R                               | Y                         |
+| Join (lobby)  | any movement key of that player | Start                     |
+| Confirm/start | Enter                           | A                         |
+| Screenshot    | H                               | LThumb                    |
+| Quit          | Esc                             | Back                      |
 
 Exit sensor only opens once you mined the required quota of diamonds —
 keep an eye on the `GEMS collected/needed` HUD counter. Extra gems beyond
