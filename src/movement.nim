@@ -78,7 +78,13 @@ proc playAnim(player: var Player; animName: string) =
     player.currentAnim = animName
     if animName == "Dig":
       animSawDig = true
-    let status = player.obj.setCurrentAnim(animName.cstring)
+    # P2-P4 use per-player animation names (IdleP2, RunP2, DigP2, ...)
+    # because ORX registers animations globally and shared names would
+    # make heroes reuse each other's anims.
+    let fullName =
+      (if player.inputSet == "" or player.inputSet == "P1": animName
+       else: animName & player.inputSet)
+    let status = player.obj.setCurrentAnim(fullName.cstring)
     when defined(debugAnim):
       echo "ANIM -> ", animName, " status=", status
 
