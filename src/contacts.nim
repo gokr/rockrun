@@ -150,6 +150,15 @@ proc processContact(contact: Contact) =
         gs.worldClockTime - gs.lastThud >= ThudInterval:
       gs.lastThud = gs.worldClockTime
       discard boulder.addSound("LandSound")
+    # A resting boulder beds into loose (refined) sand: it slowly eats the
+    # grain it rests on, dust and all. Coarse blocks never sink.
+    let sand = if firstKind == kDirt: contact.first
+               else: contact.second
+    if objectKind(sand).startsWith("SandFine"):
+      world.activateGrainColumn(sand)
+      if gs.worldClockTime - gs.lastSink >= 0.35:
+        gs.lastSink = gs.worldClockTime
+        world.destroySmallSand(sand)
 
   elif pair == {kDiamond, kDirt} or pair == {kDiamond, kWall} or
       pair == {kDiamond, kBoulder} or pair == {kDiamond, kDiamond}:

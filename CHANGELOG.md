@@ -19,27 +19,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   object, spawn point, input set, animation state per player).
 - Object destruction is deferred to end of frame (`flushDestroyed`) so
   newly created objects can never alias same-frame destroyed addresses.
-- More boulders in all three caves (24/38/47) with extra placement bands;
-  cave 1 keeps its startup-test corridor clear of falling rocks.
+- Heroes collide with each other again; `Confirm` bound to KEY_ENTER (the
+  ORX key name, KEY_RETURN was dead).
 - HUD renders through a dedicated camera-space viewport (HudViewport) so
   text always draws on top; per-player lives lines replace the single
-  LIVES counter.
-- Creatures re-steer when wedged (stuck detection).
+  LIVES counter; hero animation strips use one character consistently.
 
-### Fixed
+## [1.0.0] - 2026-08-16
 
-- Heroes 2-4 were invisible to the contact rules (`kindOf` matched only
-  the literal `Player` name): P2+ could not collect diamonds, finish the
-  cave, or be crushed, and got no contact-digging fallback. All hero
-  configs are now recognized as players.
-- `Confirm` was bound to `KEY_RETURN`, a key name ORX does not have
-  (it is `KEY_ENTER`) - the lobby could never be started with the
-  keyboard. The startup binding checks now cover it.
+First stable release.
+
+### Added
+
+- Two new caves (Rumbling Depths 56x30, The Final Chamber 56x30) plus
+  densified boulder fields in Rolling Fields and Deep Vault; First
+  Descent stays a simple tutorial. Five caves in total.
+- New huge boulder size ('R', ~54px) that crushes harder and can jam
+  tunnels; generator and parser support it.
+- Loose sand: refined 8px grains are static by default, and a resting
+  boulder now slowly beds into loose sand, eating the grain it rests on
+  (dust + creak) - simulated, always on.
+- `--sand` opt-in: boulder-pressed grains turn dynamic and give way in a
+  wedge below plus the column above the contact, capped at 300 loose
+  grains so collapse cascades stay bounded.
+- Fullscreen toggle (F key).
 
 ### Changed
 
-- Heroes collide with each other again (`PlayerPart CheckMask 0xFFFF`).
-- World gravity raised 1150 -> 1400 (boulders and gems fall faster).
+- Creature steering hardened: smaller physics body (11px), blocked-target
+  re-steering and a stuck timer; the startup test asserts cave-2
+  creatures travel >200px so steering stalls fail CI.
+- Fine-sand bookkeeping reworked into a flat grain list with per-cell
+  counts (no stale pointers); destruction guards against same-frame
+  double frees.
+- Press Start 2P font replaced with Bungee (SIL OFL), rasterized at 64px
+  for thick strokes; HUD renders through its own viewport so text always
+  sits on top of the world.
+- HUD text scales, positions and colors tuned for readability.
+
+### Fixed
+
+- Wall objects leaked across level reloads (the "second brick rectangle"
+  in cave 2, which also physically blocked the hall).
+- Boulders scale jitter removed so adjacent rocks touch.
+- Typefaces load through the Font resource group - the custom font had
+  never actually loaded before.
+- Dig dust bursts halved and the dig swing animation plays every other
+  dig with a visible pickaxe.
+- Creature explosion no longer leaves dangling tracking records.
 
 ## [0.3.2] - 2026-08-16
 
@@ -182,5 +209,5 @@ First working release.
   capture for visual review.
 - Debug build linked against liborxd, release task linked against liborx.
 
-[Unreleased]: https://github.com/gokr/rockrun/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/gokr/rockrun/releases/tag/v0.1.0
+[Unreleased]: https://github.com/gokr/rockrun/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/gokr/rockrun/releases/tag/v1.0.0

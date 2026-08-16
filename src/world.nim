@@ -27,10 +27,9 @@ type
 
   SandCell* = object
     ## One 32px cave cell either holding a big block or sixteen refined
-    ## 8px blocks (4x4 subdivision).
+    ## 8px grains (4x4 subdivision).
     big*: ptr orxOBJECT
     refined*: bool
-    subs*: array[16, ptr orxOBJECT]
     center*: orxVECTOR
 
   Player* = object
@@ -58,6 +57,8 @@ const
   ## Sub-grid size per cell (4x4) and block size in pixels.
   SubGrid* = 4
   SubBlock* = CellSize / SubGrid.float32
+  ## Maximum grains that may become loose simultaneously (--sand option).
+  MaxLooseGrains = 300
 
 proc computeSubOffsets(): array[SubGrid * SubGrid, tuple[x, y: float32]]
     {.compileTime.} =
@@ -77,6 +78,12 @@ var
   worldW*, worldH*: int
   worldMinX*, worldMaxX*, worldMinY*, worldMaxY*: float32
   sandCells*: seq[SandCell]
+  fineGrains*: seq[ptr orxOBJECT]
+  ## Every live 8px sand grain, in one flat list. Grains are dynamic only
+  ## after a boulder activates them (see activateGrainColumn), so this is
+  ## the single source of truth for digging - never stale pointers.
+  grainCounts*: seq[int]
+  ## Per-cell live grain counts (creature steering hint).
   walls*: seq[bool]
   wallObjects: seq[ptr orxOBJECT]
   pendingCreatures*: seq[tuple[config: string, x, y: int]]
@@ -95,6 +102,10 @@ var
   ## (reset by the caller; used to trigger the dig animation).
   digDustFlip = false
   ## Alternates so dust bursts appear on ~50% of dug blocks.
+  looseSandEnabled* = false
+  ## Opt-in experimental loose sand (--sand): boulders turn pressed sand
+  ## grains dynamic so they give way.
+  looseGrainCount = 0
 
 proc playerObj*(): ptr orxOBJECT =
   ## The first hero's physics object (single-player semantics), nil when
@@ -255,7 +266,7 @@ proc respawnPlayer*(index: int) =
 
 proc destroySmallSand*(gameObject: ptr orxOBJECT;
                        digger: ptr orxOBJECT = nil) =
-  ## Digs out a fine sand block: dust, sound and score. The dig sound is
+  ## Digs out a fine sand grain: dust, sound and score. The dig sound is
   ## attributed to the digging hero.
   if gameObject == nil:
     return
@@ -263,17 +274,19 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT;
   if digger == nil:
     digger = playerObj()
   let position = gameObject.getWorldPosition()
-  # Every other dug block kicks up dust, so digging isn't a dust storm.
+  # Every other dug grain kicks up dust, so digging isn't a dust storm.
   digDustFlip = not digDustFlip
   if digDustFlip:
     spawnBurst("DustPuff", position, 1)
-  # Unlink from the owning cell so later passes never see a stale pointer.
+  # Unlink from the flat list and the cell counter.
+  let index = fineGrains.find(gameObject)
+  if index >= 0:
+    fineGrains.delete(index)
   let (cx, cy) = cellOf(position)
   if cx >= 0 and cx < worldW and cy >= 0 and cy < worldH:
-    var cell = addr sandCells[cellIndex(cx, cy)]
-    for i in 0 ..< cell.subs.len:
-      if cell.subs[i] == gameObject:
-        cell.subs[i] = nil
+    let countIndex = cellIndex(cx, cy)
+    if grainCounts[countIndex] > 0:
+      dec grainCounts[countIndex]
   if digger != nil and gs.worldClockTime - gs.lastDig >= 0.11'f32:
     gs.lastDig = gs.worldClockTime
     discard digger.addSound("DigSound")
@@ -284,7 +297,7 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT;
   gs.hudDirty = true
 
 proc refineSand*(gameObject: ptr orxOBJECT) =
-  ## Replaces a 32px sand block by nine fine blocks at the same spot.
+  ## Replaces a 32px sand block by sixteen fine grains at the same spot.
   if gameObject == nil:
     return
   let (cx, cy) = cellOf(gameObject.getWorldPosition())
@@ -296,14 +309,50 @@ proc refineSand*(gameObject: ptr orxOBJECT) =
   let center = cellWorld(cx, cy)
   destroyObject(cell.big)
   cell.big = nil
-  for i, offset in SubOffsets:
+  for offset in SubOffsets:
     let sub = objectCreateFromConfig("SandFine")
     if sub != nil:
       discard sub.setPosition(
         newVector(center.fX + offset.x, center.fY + offset.y, 0.0))
-      dirts.add(sub)
-      cell.subs[i] = sub
+      fineGrains.add(sub)
+      inc grainCounts[cellIndex(cx, cy)]
   cell.refined = true
+
+proc activateGrainColumn*(grain: ptr orxOBJECT) =
+  ## A boulder presses on this fine grain: the grains around the contact
+  ## turn dynamic so they can give way - the column above the contact
+  ## (the pile wedged by the boulder) plus a cone below (repose-angle
+  ## failure). Only active with --sand; otherwise grains stay static.
+  ## The number of loose grains is capped so collapses can't cascade into
+  ## a physics meltdown.
+  if not looseSandEnabled:
+    return
+  if looseGrainCount >= MaxLooseGrains:
+    return
+  if grain == nil or isDestroyed(grain):
+    return
+  let (cx, cy) = cellOf(grain.getWorldPosition())
+  if cx < 0 or cx >= worldW or cy < 0 or cy >= worldH:
+    return
+  for candidate in fineGrains:
+    if isDestroyed(candidate):
+      continue
+    let (gx, gy) = cellOf(candidate.getWorldPosition())
+    let below = gy - cy
+    if below < -3 or below > 3:
+      continue
+    # Widening cone below the contact, pure column above it.
+    let maxSpread = (if below > 0: min(below, 2) else: 0)
+    if abs(gx - cx) > maxSpread:
+      continue
+    let body = cast[ptr orxBODY](
+      internal_orxObject_GetStructure(candidate, STRUCTURE_ID_BODY))
+    if body != nil and isDynamic(body) == orxFALSE:
+      discard setDynamic(body, orxTRUE)
+      discard candidate.setSpeed(newVector(0.0, 2.0, 0.0))
+      inc looseGrainCount
+      if looseGrainCount >= MaxLooseGrains:
+        return
 
 proc digSand*(gameObject: ptr orxOBJECT; digger: ptr orxOBJECT = nil) =
   ## Contact-triggered digging: refine big blocks, destroy fine ones.
@@ -315,27 +364,36 @@ proc digSand*(gameObject: ptr orxOBJECT; digger: ptr orxOBJECT = nil) =
 proc digAround*(origin: orxVECTOR; dirX, dirY: float32;
                 digger: ptr orxOBJECT = nil) =
   ## Digs/refines sand immediately ahead of the player's movement.
-  ## Fine 10.67px blocks in the dig path are removed; 32px blocks swapped.
-  ## Only the cells near the player are considered (windowed for speed);
-  ## static cell centers are precomputed at build time.
+  ## Fine grains in the dig path are removed (using their live position);
+  ## 32px blocks are swapped for grains first. Only cells near the player
+  ## are considered (windowed for speed).
   let (playerCellX, playerCellY) = cellOf(origin)
+  # Fine grains near the player (snapshot: digging mutates fineGrains)
+  var nearGrains: seq[ptr orxOBJECT]
+  for grain in fineGrains:
+    if grain == nil or isDestroyed(grain):
+      continue
+    let position = grain.getWorldPosition()
+    if abs(position.fX - origin.fX) < 100.0 and
+        abs(position.fY - origin.fY) < 100.0:
+      nearGrains.add(grain)
+  for grain in nearGrains:
+    if isDestroyed(grain):
+      continue
+    let position = grain.getWorldPosition()
+    let dx = position.fX - origin.fX
+    let dy = position.fY - origin.fY
+    let horizontal = dirX != 0.0 and dx * dirX > 0.0 and
+                     abs(dx) < 33.0 and abs(dy) < 17.0
+    let vertical = dirY != 0.0 and dy * dirY > 0.0 and
+                   abs(dx) < 17.0 and abs(dy) < 33.0
+    if horizontal or vertical:
+      destroySmallSand(grain)
+
   for cy in max(0, playerCellY - 2) .. min(worldH - 1, playerCellY + 2):
     for cx in max(0, playerCellX - 2) .. min(worldW - 1, playerCellX + 2):
       var cell = addr sandCells[cellIndex(cx, cy)]
-      if cell.refined:
-        for i, sub in cell.subs:
-          if sub == nil:
-            continue
-          let
-            dx = cell.center.fX + SubOffsets[i].x - origin.fX
-            dy = cell.center.fY + SubOffsets[i].y - origin.fY
-          let horizontal = dirX != 0.0 and dx * dirX > 0.0 and
-                           abs(dx) < 30.0 and abs(dy) < 17.0
-          let vertical = dirY != 0.0 and dy * dirY > 0.0 and
-                         abs(dx) < 17.0 and abs(dy) < 30.0
-          if horizontal or vertical:
-            destroySmallSand(sub, digger)
-      elif cell.big != nil:
+      if cell.big != nil:
         let dx = cell.center.fX - origin.fX
         let dy = cell.center.fY - origin.fY
         let near = (dirX != 0.0 and abs(dx) < 33.0 and abs(dy) < 24.0) or
@@ -396,7 +454,8 @@ proc clearWorld*() =
   boulders.setLen(0)
   gems.setLen(0)
   dirts.setLen(0)
-  wallObjects.setLen(0)
+  fineGrains.setLen(0)
+  grainCounts.setLen(0)
   sandCells.setLen(0)
   walls.setLen(0)
   pendingCreatures.setLen(0)
@@ -445,6 +504,8 @@ proc buildWorld(level: LevelDef): bool =
   worldMinY = -worldH.float32 * CellSize * 0.5'f32
   worldMaxY = -worldMinY
   sandCells = newSeq[SandCell](worldW * worldH)
+  grainCounts = newSeq[int](worldW * worldH)
+  fineGrains.setLen(0)
   walls = newSeq[bool](worldW * worldH)
 
   var playerCount, exitCount = 0
@@ -467,10 +528,12 @@ proc buildWorld(level: LevelDef): bool =
         dirts.add(sand)
         sandCells[cellIndex(x, y)].big = sand
         sandCells[cellIndex(x, y)].center = position
-      of 'o', 'O', 'Q':
+      of 'o', 'O', 'Q', 'R':
         let configName =
           (if symbol == 'o': "BoulderSmall"
-           elif symbol == 'Q': "BoulderBig" else: "Boulder")
+           elif symbol == 'Q': "BoulderBig"
+           elif symbol == 'R': "BoulderHuge"
+           else: "Boulder")
         let boulder = objectCreateFromConfig(configName)
         if boulder == nil or
             boulder.setPosition(
@@ -551,7 +614,7 @@ proc validateLevels*(): bool =
         of '@', '2', '3', '4': inc spawnCount
         of 'E': inc exits
         of 'D': inc gemCount
-        of ' ', '#', '.', 'o', 'O', 'Q', 'f', 'b': discard
+        of ' ', '#', '.', 'o', 'O', 'Q', 'R', 'f', 'b': discard
         else:
           echo "Startup check failed: unknown symbol '", symbol,
                "' in level ", i + 1

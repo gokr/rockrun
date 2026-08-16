@@ -82,8 +82,12 @@ Also re-generate levels after changing `tools/genlevels.py`:
 - Static cells (dirt/wall) have full 32px bodies forming a lattice; dynamic
   entities are SMALLER than the cell (player box 26px, boulder r=16, gem
   22px) — full-size dynamic bodies wedge into the lattice and freeze.
-- Sand is two-tier: 32px blocks (Repeat 3x3 texture) silently refine into
-  nine 10.7px blocks (`SubGrid`/`SubBlock` in world.nim) near the player.
+- Sand is two-tier: 32px blocks (Repeat 4x4 texture) silently refine into
+  sixteen 8px grains (`SubGrid`/`SubBlock` in world.nim) near the player.
+  Grains are tracked in a flat `fineGrains` seq (never stale) with per-cell
+  `grainCounts` for creature steering; they stay static until a boulder
+  touches them (`world.activateGrainColumn` makes the touched column
+  dynamic so it gives way).
 - The player has `CustomGravity = (0, 0, 0)` (classic BD anti-gravity). Dig
   happens by direction-aware proximity (`world.digAround`), floors require a
   downward input.
@@ -102,9 +106,9 @@ Also re-generate levels after changing `tools/genlevels.py`:
   fail to find config.
 - Box2D bodies must never be deleted from inside contact callbacks; the
   `destroyedObjects` tombstone set in `world.nim` protects same-frame pairs.
-- Core clock runs at ~display frequency (240Hz on the dev host) with dt
-  clamp — scripted tests use a dt multiplier (`TestClockMultiplier`) instead
-  of waiting real seconds.
+- Core clock is tied to 60Hz via `[Clock] MainClockFrequency` so the sim
+  advances in real time at normal frame rates; the display-refresh default
+  made heavy caves run in slow motion below refresh-rate fps.
 
 ## Gameplay / multiplayer notes
 

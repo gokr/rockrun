@@ -51,10 +51,7 @@ proc blockedAt*(cx, cy: int): bool =
     return true
   let cell = world.sandCells[cy * worldW + cx]
   if cell.refined:
-    for sub in cell.subs:
-      if sub != nil:
-        return true
-    result = false
+    result = world.grainCounts[cy * worldW + cx] > 0
   else:
     result = cell.big != nil
 

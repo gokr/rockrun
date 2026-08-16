@@ -37,6 +37,7 @@ type
     taSpawnGem
     taSpawnCreature
     taExplodeCreature
+    taCheckBoulder
     taFakeQuota
     taTeleport
     taKillPlayer
@@ -90,6 +91,7 @@ const
                cx: 31, cy: 14),
     TestAction(at: 6.5, kind: taExplodeCreature),
     TestAction(at: 8.0, kind: taScreenshot),
+    TestAction(at: 8.0, kind: taCheckBoulder),
     TestAction(at: 8.0, kind: taFakeQuota),
     TestAction(at: 8.0, kind: taTeleport, cx: 35, cy: 19),
     TestAction(at: 8.0, kind: taMove, dx: 1.0, dy: 0.0, duration: 4.0),
@@ -208,6 +210,7 @@ proc runFinalChecksMp() =
 
 let startupTest = "--startup-test" in commandLineParams()
 let startupTestMp = "--startup-test-mp" in commandLineParams()
+let looseSand = "--sand" in commandLineParams()
 
 proc setEnginePaused(paused: bool) =
   ## Zeroes dt for the whole core clock: physics and logic freeze while
@@ -249,6 +252,7 @@ proc joinActivated(index: int): bool =
 proc startRun() =
   ## Begins the run with the joined players (P1 always in).
   gs.playerCount = max(1, joinedPlayers.count(true))
+  world.looseSandEnabled = looseSand
   resetRun()
   if not world.loadWorld(0):
     return
@@ -385,6 +389,11 @@ proc runTestScript(deltaTime: float32) =
       if test.boulder != nil:
         test.boulderFellBy =
           test.boulder.getWorldPosition().fY - test.boulderSpawnY
+    of taCheckBoulder:
+      ## Main's name for the same check (its scenario uses taCheckBoulder).
+      if test.boulder != nil:
+        test.boulderFellBy =
+          test.boulder.getWorldPosition().fY - test.boulderSpawnY
     of taSpawnGem:
       ## Drops a diamond right in front of the player, inside the corridor
       ## that has already been dug (spawning inside solid sand would eject
@@ -500,6 +509,9 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
       setEnginePaused(false)
       enterPhase(phPlaying)
       ui.hideMessages()
+
+  if hasBeenActivated("ToggleFullScreen"):
+    discard setFullScreen(not isFullScreen().bool)
 
   if hasBeenActivated("Restart"):
     if gs.phase in {phGameOver, phAllComplete}:
@@ -655,7 +667,7 @@ proc runConfigChecks(): bool =
     return false
 
   for section in ["Player", "Player2", "Player3", "Player4",
-                  "BoulderSmall", "Boulder", "BoulderBig",
+                  "BoulderSmall", "Boulder", "BoulderBig", "BoulderHuge",
                   "Diamond", "Sand32", "SandFine", "Wall", "Exit",
                   "DustPuff", "GemSparkle", "AudioSource"]:
     let testObject = objectCreateFromConfig(section)
@@ -742,6 +754,7 @@ proc init(): orxSTATUS {.cdecl.} =
 
   resetRun()
   joinedPlayers[0] = true
+  world.looseSandEnabled = looseSand
   if startupTest or startupTestMp:
     gs.playerCount = (if startupTestMp: 2 else: 1)
     testScenario = (if startupTestMp: ScenarioMp else: Scenario)
