@@ -11,6 +11,10 @@ import math
 import os
 import random
 
+# Output next to the repo the script lives in (was hardcoded to the
+# main worktree, which corrupts it when run from a worktree).
+OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "texture")
+
 from PIL import Image, ImageDraw, ImageFilter
 
 SIZE = 64
@@ -95,7 +99,7 @@ def make_boulder(name, frac, seed):
     final = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     final.paste(shadow, outpos, shadow)
     final.paste(img, (0, 0), mask)
-    final.save(f"/home/gokr/git/rockrun/data/texture/{name}.png")
+    final.save(os.path.join(OUT_DIR, f"{name}.png"))
     return final
 
 
@@ -165,7 +169,7 @@ def make_diamond(seed):
     final = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     final.paste(glow_img, (0, 0), glow)
     final.paste(img, (0, 0), mask)
-    final.save("/home/gokr/git/rockrun/data/texture/diamond.png")
+    final.save(os.path.join(OUT_DIR, "diamond.png"))
     return final
 
 
@@ -208,7 +212,7 @@ def make_dirt(seed):
     blot = blot.filter(ImageFilter.GaussianBlur(7))
     base = Image.blend(base, blot, 0.22)
     base = base.filter(ImageFilter.GaussianBlur(0.5))
-    base.convert("RGBA").save("/home/gokr/git/rockrun/data/texture/dirt.png")
+    base.convert("RGBA").save(os.path.join(OUT_DIR, "dirt.png"))
     return base
 
 
@@ -242,21 +246,26 @@ def make_firefly(name, body_rgb, wing_rgb, seed):
     # eyes
     d.ellipse([cx - 8, cy - 9, cx - 2, cy - 3], fill=(10, 10, 25, 255))
     d.ellipse([cx + 2, cy - 9, cx + 8, cy - 3], fill=(10, 10, 25, 255))
-    img.save(f"/home/gokr/git/rockrun/data/texture/{name}.png")
+    img.save(os.path.join(OUT_DIR, f"{name}.png"))
     return img
 
 
 def make_hero_strips():
     """Cuts the Kenney adventurer sheet (tools/kenney-characters.png,
-    9x3 grid of 24px tiles with 1px spacing) into three animation strips:
-    idle (4), run (6), hit/dig (3). A procedural pickaxe swing is drawn
-    over the dig frames so the action reads as digging."""
+    9x3 grid of 24px tiles with 1px spacing) into three animation strips.
+    Row 0 holds the same character model in several palette variants,
+    each a 2-frame walk cycle: green (0-1), blue (2-3), pink (4-5),
+    brown (6-7) - the pink pair is 'player 1'. All strips use the hero's
+    own pink/brown frames so the hero never changes character between
+    states; row 1/2 hold other characters and are not used. A procedural
+    pickaxe swing is drawn over the dig frames so the action reads as
+    digging."""
     src = os.path.join(os.path.dirname(__file__), "kenney-characters.png")
     sheet = Image.open(src).convert("RGBA")
     plans = {
-        "idle": [0, 1, 2, 3],
-        "run": [4, 5, 6, 7, 8, 9],
-        "dig": [17, 18, 19],
+        "idle": [4, 5],
+        "run": [4, 5, 6, 7],
+        "dig": [4, 5, 4],
     }
     for name, sel in plans.items():
         out = Image.new("RGBA", (24 * len(sel), 24), (0, 0, 0, 0))
@@ -266,7 +275,7 @@ def make_hero_strips():
             if name == "dig":
                 tile = add_pickaxe(tile, n)
             out.paste(tile, (n * 24, 0), tile)
-        out.save(f"/home/gokr/git/rockrun/data/texture/{name}.png")
+        out.save(os.path.join(OUT_DIR, f"{name}.png"))
 
 
 def add_pickaxe(tile, step):
