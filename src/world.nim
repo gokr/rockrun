@@ -208,7 +208,19 @@ proc destroyObject*(gameObject: ptr orxOBJECT) =
   if gameObject == nil:
     return
   if not structureValid(gameObject):
-    echo "Rockrun: destroyObject on invalid object pointer (skipped)"
+    # A stale pointer reached the teardown path. Log the offender and
+    # scrub it from tracking lists instead of crashing ORX.
+    var where = ""
+    if world.boulders.find(gameObject) >= 0:
+      where.add(" boulders")
+    if world.gems.find(gameObject) >= 0:
+      where.add(" gems")
+    if world.dirts.find(gameObject) >= 0:
+      where.add(" dirts")
+    if wallObjects.find(gameObject) >= 0:
+      where.add(" walls")
+    echo "Stale ORX object ", cast[uint](gameObject), " in:", where
+    removeTracked(gameObject)
     return
   if cast[pointer](gameObject) in destroyedObjects:
     return
@@ -284,7 +296,8 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT;
                        digger: ptr orxOBJECT = nil) =
   ## Digs out a fine sand grain: dust, sound and score. The dig sound is
   ## attributed to the digging hero.
-  if gameObject == nil:
+  if gameObject == nil or isDestroyed(gameObject):
+    return
     return
   var digger = digger
   if digger == nil:
@@ -457,16 +470,24 @@ proc spawnBoulderAt*(cx, cy: int): ptr orxOBJECT =
     world.boulders.add(result)
 
 proc clearWorld*() =
-  ## Deletes every spawned object. The concatenated copy is needed because
-  ## destruction removes objects from these very sequences.
+  ## Deletes every spawned object. The concatenated copy is deduplicated
+  ## (a pointer could live in several tracking lists) because destruction
+  ## removes objects from these very sequences.
   var pass = newSeqOfCap[ptr orxOBJECT](
     boulders.len + gems.len + dirts.len + wallObjects.len)
-  pass.add(boulders)
-  pass.add(gems)
-  pass.add(dirts)
-  pass.add(wallObjects)
+  var seen = initHashSet[pointer]()
+  for batch in [boulders, gems, dirts, wallObjects]:
+    for gameObject in batch:
+      if cast[pointer](gameObject) in seen:
+        continue
+      seen.incl(cast[pointer](gameObject))
+      pass.add(gameObject)
   for gameObject in pass:
     destroyObject(gameObject)
+  # Fine grains aren't in the teardown lists - destroy them explicitly
+  # so no bodies leak into the next cave.
+  for grain in fineGrains:
+    destroyObject(grain)
   boulders.setLen(0)
   gems.setLen(0)
   dirts.setLen(0)

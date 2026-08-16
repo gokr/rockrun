@@ -18,7 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The single hero is now a `Player` record in `world.players` (physics
   object, spawn point, input set, animation state per player).
 - Object destruction is deferred to end of frame (`flushDestroyed`) so
-  newly created objects can never alias same-frame destroyed addresses.
+  newly created objects can never alias same-frame destroyed addresses;
+  `destroyObject` validates ORX structure pointers and scrubs stale
+  entries instead of crashing, the teardown pass is deduplicated, and
+  fine sand grains are explicitly destroyed on level reload.
 - Heroes collide with each other again; `Confirm` bound to KEY_ENTER (the
   ORX key name, KEY_RETURN was dead).
 - HUD renders through a dedicated camera-space viewport (HudViewport) so
