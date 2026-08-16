@@ -331,6 +331,44 @@ def add_pickaxe(tile, step):
     return tile
 
 
+def make_icon():
+    """512x512 app icon: a boulder with a gem, on a dark cave backdrop."""
+    size = 512
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    # rounded backdrop
+    d.rounded_rectangle([8, 8, size - 8, size - 8], radius=90,
+                        fill=(18, 20, 30, 255))
+    # cave sand hint at the bottom
+    d.rounded_rectangle([40, 360, 472, 460], radius=40,
+                        fill=(120, 84, 46, 255))
+    # boulder: irregular polygon with facets
+    cx, cy, r = 210, 260, 150
+    pts = [(cx + r * math.cos(a), cy + r * math.sin(a))
+           for a in [i * 2 * math.pi / 10 for i in range(10)]]
+    d.polygon(pts, fill=(150, 138, 120, 255), outline=(70, 60, 50, 255))
+    # boulder facets
+    d.polygon([(cx - 60, cy - 70), (cx + 40, cy - 100), (cx + 80, cy - 20),
+               (cx - 10, cy + 10)], fill=(120, 108, 92, 255))
+    d.polygon([(cx + 10, cy + 20), (cx + 110, cy - 10), (cx + 90, cy + 90),
+               (cx + 20, cy + 80)], fill=(96, 84, 70, 255))
+    d.ellipse([cx - 70, cy - 110, cx + 30, cy - 60], fill=(190, 182, 165, 255))
+    # gem sticking out of the sand
+    gx, gy = 330, 310
+    d.polygon([(gx, gy - 70), (gx + 70, gy - 40), (gx + 55, gy + 30),
+               (gx - 55, gy + 30), (gx - 70, gy - 40)], fill=(60, 210, 240, 255))
+    d.polygon([(gx, gy - 70), (gx, gy + 30), (gx - 55, gy + 30),
+               (gx - 70, gy - 40)], fill=(40, 160, 220, 255))
+    d.polygon([(gx, gy - 70), (gx + 70, gy - 40), (gx + 55, gy + 30),
+               (gx, gy + 30)], fill=(90, 230, 250, 255))
+    d.polygon([(gx, gy - 70), (gx, gy + 30)], fill=(200, 250, 255, 255))
+    d.ellipse([gx - 12, gy - 58, gx + 10, gy - 40], fill=(240, 255, 255, 255))
+    out = os.path.join(os.path.dirname(__file__), "..", "assets")
+    os.makedirs(out, exist_ok=True)
+    img.save(os.path.join(out, "rockrun.png"))
+    return img
+
+
 if __name__ == "__main__":
     # Blobs are drawn slightly larger than the canvas so the rock fills it
     # nearly edge to edge: the visible rock then matches the physics
@@ -338,6 +376,7 @@ if __name__ == "__main__":
     make_boulder("boulder_small", 1.06, 11)
     make_boulder("boulder", 1.06, 23)
     make_boulder("boulder_big", 1.06, 41)
+    make_icon()
     make_diamond(5)
     make_dirt(3)
     # Fireflies: teal wall-hugger (turns right) and purple butterfly

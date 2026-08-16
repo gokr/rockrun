@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Cross-platform distribution scripts (adapted from Tankfeud): Linux
+  AppImage (`makelinux.sh`), Windows zip via a Vagrant VM
+  (`makewindows.sh` + `scripts/*.bat`), macOS app bundle + DMG
+  (`makemac.sh`), and itch.io publishing (`publish.sh` via butler).
+  `config.nims` is now platform-aware (Windows cross build links the
+  bundled orx.dll explicitly).
+- App icon generated into `assets/rockrun.png` and bundled into the
+  Linux AppImage template.
+
 ## [1.1.0] - 2026-08-16
 
 Local co-op multiplayer.

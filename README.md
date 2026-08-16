@@ -116,6 +116,22 @@ nimble release                       # release (links liborx)
 The resulting binary finds its `data/` directory relative to the executable,
 the working directory, or the source tree, so you can run it from anywhere.
 
+## Distribution
+
+Cross-platform packages (adapted from the Tankfeud build setup):
+
+| Platform | Script | Output |
+|----------|--------|--------|
+| Linux    | `./makelinux.sh`   | AppImage (requires `appimagetool`) |
+| Windows  | `./makewindows.sh` | zip via a Vagrant Windows 10 VM |
+| macOS    | `./makemac.sh`     | DMG app bundle (run on a Mac) |
+| itch.io  | `./publish.sh gokr/rockrun` | pushes all builds via `butler` |
+
+The Windows VM needs a one-time `scripts/windows-setup.bat` run as
+Administrator (installs Chocolatey, Git, Nim, MinGW); `makeorxwindows.sh`
+builds the bundled `orx.dll` inside the VM. macOS builds ad-hoc sign the
+bundle (users right-click > Open on first launch).
+
 ## Running
 
 ```bash
