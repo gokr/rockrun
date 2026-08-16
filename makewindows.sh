@@ -17,6 +17,7 @@ mkdir -p $DEST
 # Copy template
 cp -a templates/windows/rockrun-WindowsDir.x86_64/. $DEST/ || true
 cp -a data $DEST/
+cp LICENSE $DEST/
 
 # Build orx.dll if needed and copy it
 if [ ! -f $SCRIPT_DIR/build/orx/orx.dll ]; then

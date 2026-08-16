@@ -36,6 +36,7 @@ cp -a templates/appimage/rockrun-AppDir.x86-64/. $DEST/
 
 # Game data next to the binary (bootstrap looks in getAppDir()/data)
 cp -a data $DEST/usr/bin/
+cp LICENSE $DEST/usr/bin/
 
 # ORX runtime library
 cp "$ORX_LIB" $DEST/usr/lib/

@@ -85,6 +85,7 @@ cp "${APP_NAME}" "${CONTENTS}/MacOS/"
 cp "${ORX_LIB}" "${CONTENTS}/Frameworks/"
 cp -a data "${CONTENTS}/MacOS/"
 cp -a data "${CONTENTS}/Resources/"
+cp LICENSE "${CONTENTS}/Resources/"
 
 # Icon
 ICON_SRC="${SCRIPT_DIR}/assets/rockrun.png"

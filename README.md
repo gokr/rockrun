@@ -42,7 +42,7 @@ diamonds to open the exit, and get out before the clock or a boulder gets you.
 - **Procedurally generated textures** (`tools/genassets.py`): rocky
   boulders, faceted teal gems, organic sand, firefly and butterfly
   sprites - regenerated deterministically.
-- **Retro pixel HUD font** (Press Start 2P, SIL OFL) rendering the score,
+- **Retro pixel HUD font** (Bungee, SIL OFL) rendering the score,
   gem quota, timer, lives and cave name on a screen-aligned layer.
 - **Full game controller support** — digital d-pad *and* analog left-stick
   movement, Start to pause, A/Start to confirm, Back to quit, plus full
