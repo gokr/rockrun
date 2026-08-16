@@ -81,8 +81,9 @@ Also re-generate levels after changing `tools/genlevels.py`:
   own Texture/KeyDuration, and the hero strips are 24px frames rendered at
   object scale 1.25 (physics box must stay ~26px via explicit part
   TopLeft/BottomRight).
-- HUD lives in a second viewport; ORX draws viewports first-created-first,
-  and HUD objects are Z-separated so the main camera never renders them.
+- HUD lives in the main viewport as `ParentCamera` objects (camera-space
+  positions); a second HUD viewport rendered the world twice (offset
+  cave-border copy) and was removed.
 - ORX needs the ini named after the executable: keep `rockrun.ini` in sync
   with `bin = "rockrun"`, or tests built with a different `-o:` name will
   fail to find config.

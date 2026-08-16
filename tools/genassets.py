@@ -170,34 +170,44 @@ def make_diamond(seed):
 
 
 def make_dirt(seed):
-    """Organic sand block, full bleed (fills the whole tile)."""
+    """Organic sand block, full bleed; several pebbles per tile so even
+    small 8px blocks read as granular."""
     r = random.Random(seed)
     size = SIZE
     base = radial_shade(size, (196, 138, 62), strength=0.42,
                         center=(0.5, 0.5))
     noise = Image.effect_noise((size, size), 34).convert("RGB")
-    base = Image.blend(base, noise, 0.20)
+    base = Image.blend(base, noise, 0.18)
     d = ImageDraw.Draw(base)
-    # pebbles and speckles
-    for _ in range(26):
-        x = r.uniform(4, size - 4)
-        y = r.uniform(4, size - 4)
-        rr = r.uniform(1.4, 3.2)
+    # many tiny pebbles
+    for _ in range(34):
+        x = r.uniform(3, size - 3)
+        y = r.uniform(3, size - 3)
+        rr = r.uniform(1.1, 2.4)
         shade = r.choice([(150, 102, 46), (170, 120, 55),
-                          (215, 160, 85), (130, 92, 45)])
+                          (215, 160, 85), (130, 92, 45), (190, 140, 70)])
         d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=shade)
+    # a few bigger stones
+    for _ in range(4):
+        x = r.uniform(6, size - 6)
+        y = r.uniform(6, size - 6)
+        rr = r.uniform(2.6, 4.2)
+        shade = r.choice([(142, 96, 44), (162, 114, 52), (205, 152, 80)])
+        d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=shade)
+        d.ellipse([x - rr * 0.4, y - rr * 0.45, x + rr * 0.2, y + rr * 0.1],
+                  fill=(232, 190, 120))
     # subtle darker blotches
     blot = Image.new("RGB", (size, size), (0, 0, 0))
     bd = ImageDraw.Draw(blot)
-    for _ in range(4):
+    for _ in range(3):
         x = r.uniform(0, size)
         y = r.uniform(0, size)
-        rr = r.uniform(8, 16)
+        rr = r.uniform(7, 14)
         bd.ellipse([x - rr, y - rr, x + rr, y + rr],
                    fill=(r.randint(6, 22),) * 3)
     blot = blot.filter(ImageFilter.GaussianBlur(7))
-    base = Image.blend(base, blot, 0.25)
-    base = base.filter(ImageFilter.GaussianBlur(0.6))
+    base = Image.blend(base, blot, 0.22)
+    base = base.filter(ImageFilter.GaussianBlur(0.5))
     base.convert("RGBA").save("/home/gokr/git/rockrun/data/texture/dirt.png")
     return base
 
@@ -238,7 +248,8 @@ def make_firefly(name, body_rgb, wing_rgb, seed):
 def make_hero_strips():
     """Cuts the Kenney adventurer sheet (tools/kenney-characters.png,
     9x3 grid of 24px tiles with 1px spacing) into three animation strips:
-    idle (4), run (6), hit/dig (3)."""
+    idle (4), run (6), hit/dig (3). A procedural pickaxe swing is drawn
+    over the dig frames so the action reads as digging."""
     src = os.path.join(os.path.dirname(__file__), "kenney-characters.png")
     sheet = Image.open(src).convert("RGBA")
     plans = {
@@ -251,8 +262,31 @@ def make_hero_strips():
         for n, i in enumerate(sel):
             col, row = i % 9, i // 9
             tile = sheet.crop((col * 25, row * 25, col * 25 + 24, row * 25 + 24))
+            if name == "dig":
+                tile = add_pickaxe(tile, n)
             out.paste(tile, (n * 24, 0), tile)
         out.save(f"/home/gokr/git/rockrun/data/texture/{name}.png")
+
+
+def add_pickaxe(tile, step):
+    """Draws a swinging pickaxe over a dig frame: step 0 winds up, step 1
+    is overhead, step 2 is swung down in front."""
+    d = ImageDraw.Draw(tile)
+    angles = {0: -55, 1: 90, 2: -150}
+    angle = math.radians(angles[step])
+    px, py = 13.5, 13.0            # grip point (hands)
+    hx = px + 11 * math.cos(angle)
+    hy = py + 11 * math.sin(angle)
+    # handle
+    d.line([(px, py), (hx, hy)], fill=(128, 84, 40, 255), width=2)
+    # head: small arc perpendicular to the handle
+    import math as _m
+    perp = angle + _m.pi / 2
+    hw = 4.5
+    a1 = (hx + hw * math.cos(perp), hy + hw * math.sin(perp))
+    a2 = (hx - hw * math.cos(perp), hy - hw * math.sin(perp))
+    d.line([a1, a2], fill=(190, 195, 200, 255), width=3)
+    return tile
 
 
 if __name__ == "__main__":

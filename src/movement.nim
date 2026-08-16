@@ -80,7 +80,6 @@ proc updatePlayer*(deltaTime: float32) =
 
   let digBefore = dirts.len
   digAround(player.getWorldPosition(), dx, dy)
-
   # Animation state machine: brief dig swing when digging, run while
   # moving, idle otherwise.
   if digAnimTimer > 0.0:
@@ -88,7 +87,9 @@ proc updatePlayer*(deltaTime: float32) =
     if digAnimTimer <= 0.0 and dx == 0.0 and dy == 0.0:
       playAnim("Idle")
   if dirts.len < digBefore and digAnimTimer <= 0.0:
-    digAnimTimer = 0.24
+    # 3 frames at ~0.12s; retriggers every frame the player keeps
+    # digging, so the swing loops for the whole dig.
+    digAnimTimer = 0.36
     playAnim("Dig")
   elif digAnimTimer <= 0.0:
     if dx != 0.0 or dy != 0.0:

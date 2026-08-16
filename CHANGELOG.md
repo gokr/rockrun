@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-16
+
+HUD rendering fix, finer sand and tighter hero.
+
+### Fixed
+
+- HUD now lives in the main viewport via `ParentCamera` objects; the
+  second HUD viewport is gone. It caused the world to render twice
+  (offset copy of the cave border visible in scrolling caves).
+- Hero animation pivot: `Pivot = center` on the animation set keeps the
+  sprite aligned with the physics body.
+- Dig envelope tightened (30x34px) so tunnels match the figure size
+  instead of digging a much wider/higher path than the player.
+
+### Changed
+
+- Fine sand is now 4x4 (8px blocks) with a pebble-richer texture; coarse
+  blocks use Repeat (4,4) to stay seamless.
+- Dig animation loops while digging and includes a procedurally drawn
+  pickaxe swing (wound-up, overhead, swung-down).
+- Fireflies/butterflies enlarged (scale 0.34, ~22px).
+- Cave 2 start area: wide carved corridor into the left shaft and
+  two-row-tall entrances into the central hall.
+
 ## [0.3.1] - 2026-08-16
 
 Animation wiring, tunnel routing and text size fixes.

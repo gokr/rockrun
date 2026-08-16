@@ -43,7 +43,7 @@ type
     failures: seq[string]
 
 var
-  mainViewport, hudViewport: ptr orxVIEWPORT
+  mainViewport: ptr orxVIEWPORT
   mainCamera: ptr orxCAMERA
   cameraHalfW, cameraHalfH: float32
   coreClock: ptr orxCLOCK
@@ -426,8 +426,7 @@ proc init(): orxSTATUS {.cdecl.} =
     discard popSection()
 
   mainViewport = viewportCreateFromConfig("MainViewport")
-  hudViewport = viewportCreateFromConfig("HudViewport")
-  if mainViewport == nil or hudViewport == nil:
+  if mainViewport == nil:
     echo "Could not create the viewports"
     return STATUS_FAILURE
   mainCamera = getCamera(mainViewport)

@@ -131,12 +131,11 @@ def level2():
         for y in (13, 16):
             g[y][x] = DIRT
     # entry tunnels into the hall so it's reachable from the shafts
-    carve(g, 11, 11, 15, 11)
-    carve(g, 33, 12, 38, 12)
+    carve(g, 11, 11, 15, 12)
+    carve(g, 33, 12, 38, 13)
     carve(g, 20, 8, 28, 9)
-    # connector from the start pocket to the left shaft
-    carve(g, 6, 3, 8, 3)
-    carve(g, 6, 4, 8, 4)
+    # wide obvious corridor from the start pocket to the left shaft
+    carve(g, 4, 3, 8, 5)
     # side shafts
     carve(g, 9, 4, 10, 20)
     carve(g, 38, 6, 39, 18)

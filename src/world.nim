@@ -26,16 +26,16 @@ type
     rows*: seq[string]
 
   SandCell* = object
-    ## One 32px cave cell either holding a big block or nine refined
-    ## 10.67px blocks (3x3 subdivision).
+    ## One 32px cave cell either holding a big block or sixteen refined
+    ## 8px blocks (4x4 subdivision).
     big*: ptr orxOBJECT
     refined*: bool
-    subs*: array[9, ptr orxOBJECT]
+    subs*: array[16, ptr orxOBJECT]
     center*: orxVECTOR
 
 const
-  ## Sub-grid size per cell (3x3) and block size in pixels.
-  SubGrid* = 3
+  ## Sub-grid size per cell (4x4) and block size in pixels.
+  SubGrid* = 4
   SubBlock* = CellSize / SubGrid.float32
 
 proc computeSubOffsets(): array[SubGrid * SubGrid, tuple[x, y: float32]]
@@ -216,16 +216,16 @@ proc digAround*(origin: orxVECTOR; dirX, dirY: float32) =
             dx = cell.center.fX + SubOffsets[i].x - origin.fX
             dy = cell.center.fY + SubOffsets[i].y - origin.fY
           let horizontal = dirX != 0.0 and dx * dirX > 0.0 and
-                           abs(dx) < 33.0 and abs(dy) < 28.0
+                           abs(dx) < 30.0 and abs(dy) < 17.0
           let vertical = dirY != 0.0 and dy * dirY > 0.0 and
-                         abs(dx) < 28.0 and abs(dy) < 33.0
+                         abs(dx) < 17.0 and abs(dy) < 30.0
           if horizontal or vertical:
             destroySmallSand(sub)
       elif cell.big != nil:
         let dx = cell.center.fX - origin.fX
         let dy = cell.center.fY - origin.fY
-        let near = (dirX != 0.0 and abs(dx) < 36.0 and abs(dy) < 32.0) or
-                   (dirY != 0.0 and abs(dx) < 32.0 and abs(dy) < 36.0)
+        let near = (dirX != 0.0 and abs(dx) < 33.0 and abs(dy) < 24.0) or
+                   (dirY != 0.0 and abs(dx) < 24.0 and abs(dy) < 33.0)
         if near:
           refineSand(cell.big)
 
