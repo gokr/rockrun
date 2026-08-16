@@ -89,17 +89,12 @@ proc killHero(heroObj: ptr orxOBJECT; reason: string) =
       ui.showSubMessage(
         (if hero.down: "OUT OF LIVES" else: &"LIVES {hero.lives}"), 1.6)
 
-proc crushMomentum(boulder, other: ptr orxOBJECT;
-                   normal: orxVECTOR): float32 =
-  ## Momentum of a boulder genuinely hitting `other`. The normal is
-  ## re-oriented from the other body's center toward the boulder's
-  ## center; a crush requires (1) the boulder's OWN velocity to point
-  ## toward the other body (v_b . n < 0) and (2) the closing speed
-  ## (v_other - v_b) . n to be positive - so the player pushing or
-  ## ramming a boulder (the boulder isn't moving toward them) can never
-  ## trigger a crush, a player outrunning a falling boulder is safe,
-  ## but any boulder genuinely coming at the body - fall, roll or short
-  ## head-drop - crushes. Grazing contacts project to ~0.
+proc boulderApproach(boulder, other: ptr orxOBJECT;
+                     normal: orxVECTOR): tuple[toward, closing: float32] =
+  ## The boulder's motion relative to `other` along the contact normal
+  ## (re-oriented from the other body toward the boulder): `toward` is
+  ## the boulder's own velocity component toward the body (negative =
+  ## approaching), `closing` the speed at which the gap shrinks.
   var n = normal
   let boulderPos = boulder.getWorldPosition()
   let otherPos = other.getWorldPosition()
@@ -109,14 +104,34 @@ proc crushMomentum(boulder, other: ptr orxOBJECT;
     n.fY = -n.fY
   let bspeed = boulder.getSpeed()
   let ospeed = other.getSpeed()
-  let boulderToward = bspeed.fX * n.fX + bspeed.fY * n.fY
-  if boulderToward >= 0.0:
-    return 0.0
-  let closing = (ospeed.fX - bspeed.fX) * n.fX +
-                (ospeed.fY - bspeed.fY) * n.fY
-  if closing <= 0.0:
-    return 0.0
-  result = boulder.getMass() * closing
+  result.toward = bspeed.fX * n.fX + bspeed.fY * n.fY
+  result.closing = (ospeed.fX - bspeed.fX) * n.fX +
+                   (ospeed.fY - bspeed.fY) * n.fY
+
+proc heroCrush(boulder, hero: ptr orxOBJECT; normal: orxVECTOR): bool =
+  ## Crush decision for heroes. A boulder can be HELD: when it settles
+  ## onto the hero slowly (closing below HoldCrushSpeed, e.g. dug out
+  ## from underneath), the decision is by weight - pebbles and classic
+  ## boulders are supported, big/huge crush. Fast arrivals are impacts
+  ## and judged by momentum (mass x closing). Pushes and rams can never
+  ## crush: the boulder's own velocity must point toward the hero and
+  ## the hero must not be outrunning it.
+  let motion = boulderApproach(boulder, hero, normal)
+  if motion.toward >= 0.0 or motion.closing <= 0.0:
+    return false
+  let mass = boulder.getMass()
+  if mass > HoldMass:
+    return true
+  result = motion.closing > HoldCrushSpeed and
+           mass * motion.closing > CrushMomentum
+
+proc creatureCrush(boulder, creature: ptr orxOBJECT;
+                   normal: orxVECTOR): bool =
+  ## Crush decision for creatures: no holding - any boulder genuinely
+  ## moving onto one pops it into diamonds.
+  let motion = boulderApproach(boulder, creature, normal)
+  result = motion.toward < 0.0 and motion.closing > 0.0 and
+           boulder.getMass() * motion.closing > CrushMomentum
 
 proc processContact(contact: Contact) =
   if gs.phase != phPlaying:
@@ -160,7 +175,7 @@ proc processContact(contact: Contact) =
                 else: contact.second
       heroObj = if firstKind == kPlayer: contact.first
                 else: contact.second
-    if crushMomentum(boulder, heroObj, contact.normal) > CrushMomentum:
+    if heroCrush(boulder, heroObj, contact.normal):
       killHero(heroObj, "Crushed by a boulder")
     elif impactSpeed(boulder) > ThudMinSpeed and
         gs.worldClockTime - gs.lastThud >= ThudInterval:
@@ -193,7 +208,7 @@ proc processContact(contact: Contact) =
                 else: contact.second
       creatureObj = if firstKind == kCreature: contact.first
                     else: contact.second
-    if crushMomentum(boulder, creatureObj, contact.normal) > CrushMomentum:
+    if creatureCrush(boulder, creatureObj, contact.normal):
       creatures.explodeCreature(creatureObj)
 
   elif pair == {kBoulder, kDirt} or pair == {kBoulder, kWall} or

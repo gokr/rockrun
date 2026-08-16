@@ -16,6 +16,16 @@ const
   ## huge boulder crushes from a tiny drop while a pebble needs a real
   ## one.
   CrushMomentum* = 10.0'f32
+  ## Boulders heavier than this crush even when they settle slowly onto
+  ## the hero - lighter ones can be held/stood under (dug out and
+  ## supported on the head). With density 12: pebble 0.077, classic
+  ## 0.207 (both holdable), big 0.52, huge 0.98 (crushing).
+  HoldMass* = 0.3'f32
+  ## Approaches faster than this are impacts, not settling: a holdable
+  ## boulder dropped onto the hero from height still crushes
+  ## (a settle from digging under it closes at ~100-150 px/s,
+  ## a one-cell drop at ~300).
+  HoldCrushSpeed* = 250.0'f32
   ## Phase durations in seconds.
   IntroTime* = 1.7'f32
   DyingTime* = 1.6'f32
