@@ -57,6 +57,7 @@ var
   worldMinX*, worldMaxX*, worldMinY*, worldMaxY*: float32
   sandCells*: seq[SandCell]
   walls*: seq[bool]
+  wallObjects: seq[ptr orxOBJECT]
   pendingCreatures*: seq[tuple[config: string, x, y: int]]
   player*: ptr orxOBJECT
   exitObject*: ptr orxOBJECT
@@ -67,6 +68,9 @@ var
 
 var
   destroyedObjects: HashSet[pointer]
+  dugThisFrame*: int
+  ## Number of fine sand blocks actually dug out during the current frame
+  ## (reset by the caller; used to trigger the dig animation).
 
 proc levelSection(index: int): string = "Level" & $(index + 1)
 
@@ -100,6 +104,15 @@ proc readLevel*(index: int; level: var LevelDef): bool =
            " instead of ", width
       return false
   result = true
+
+const
+  ## Render Z for entities that must draw above the sand lattice (the big
+  ## boulders spill into neighbor cells and would otherwise be covered).
+  BoulderZ* = 0.5'f32
+  GemZ* = 0.5'f32
+  CreatureZ* = 0.5'f32
+  ExitZ* = 0.4'f32
+  PlayerZ* = 0.6'f32
 
 proc cellWorld*(x, y: int): orxVECTOR =
   ## World position of the center of a cell; the cave is centered at 0,0.
@@ -167,6 +180,7 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT) =
     discard player.addSound("DigSound")
   destroyObject(gameObject)
   gs.dirtDug += 1
+  dugThisFrame += 1
   addScore(gs.digScore)
   gs.hudDirty = true
 
@@ -232,7 +246,12 @@ proc digAround*(origin: orxVECTOR; dirX, dirY: float32) =
 proc collectGem*(gem: ptr orxOBJECT) =
   ## Picks up a diamond: score, sparkle, and exit bookkeeping.
   if world.gems.find(gem) < 0:
+    when defined(debugContacts):
+      echo "COLLECT skip: gem not tracked"
     return
+  when defined(debugContacts):
+    echo "COLLECT gem at ", gem.getWorldPosition().fX, ",",
+         gem.getWorldPosition().fY
   let position = gem.getWorldPosition()
   spawnBurst("GemSparkle", position, 3)
   if player != nil:
@@ -262,15 +281,17 @@ proc clearWorld*() =
   ## Deletes every spawned object. The concatenated copy is needed because
   ## destruction removes objects from these very sequences.
   var pass = newSeqOfCap[ptr orxOBJECT](
-    boulders.len + gems.len + dirts.len)
+    boulders.len + gems.len + dirts.len + wallObjects.len)
   pass.add(boulders)
   pass.add(gems)
   pass.add(dirts)
+  pass.add(wallObjects)
   for gameObject in pass:
     destroyObject(gameObject)
   boulders.setLen(0)
   gems.setLen(0)
   dirts.setLen(0)
+  wallObjects.setLen(0)
   sandCells.setLen(0)
   walls.setLen(0)
   pendingCreatures.setLen(0)
@@ -302,6 +323,7 @@ proc buildWorld(level: LevelDef): bool =
         if wall == nil or wall.setPosition(position).isFailure:
           echo "Could not create a wall at ", x, ",", y
           return false
+        wallObjects.add(wall)
       of '.':
         let sand = objectCreateFromConfig("Sand32")
         if sand == nil or sand.setPosition(position).isFailure:
@@ -315,13 +337,17 @@ proc buildWorld(level: LevelDef): bool =
           (if symbol == 'o': "BoulderSmall"
            elif symbol == 'Q': "BoulderBig" else: "Boulder")
         let boulder = objectCreateFromConfig(configName)
-        if boulder == nil or boulder.setPosition(position).isFailure:
+        if boulder == nil or
+            boulder.setPosition(
+              newVector(position.fX, position.fY, BoulderZ)).isFailure:
           echo "Could not create a boulder at ", x, ",", y
           return false
         boulders.add(boulder)
       of 'D':
         let gem = objectCreateFromConfig("Diamond")
-        if gem == nil or gem.setPosition(position).isFailure:
+        if gem == nil or
+            gem.setPosition(
+              newVector(position.fX, position.fY, GemZ)).isFailure:
           echo "Could not create a diamond at ", x, ",", y
           return false
         discard gem.addFX("SparkleFX")
@@ -329,7 +355,9 @@ proc buildWorld(level: LevelDef): bool =
         inc gs.gemTotal
       of 'E':
         exitObject = objectCreateFromConfig("Exit")
-        if exitObject == nil or exitObject.setPosition(position).isFailure:
+        if exitObject == nil or
+            exitObject.setPosition(
+              newVector(position.fX, position.fY, ExitZ)).isFailure:
           echo "Could not create the exit"
           return false
         inc exitCount
@@ -358,7 +386,9 @@ proc buildWorld(level: LevelDef): bool =
   if player == nil:
     echo "Could not create the player"
     return false
-  result = player.setPosition(cellWorld(playerSpawnX, playerSpawnY)).isSuccess
+  let spawn = cellWorld(playerSpawnX, playerSpawnY)
+  result = player.setPosition(
+    newVector(spawn.fX, spawn.fY, PlayerZ)).isSuccess
 
 proc loadWorld*(index: int): bool =
   ## Parses and instantiates a level, replacing the current world.

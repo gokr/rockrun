@@ -89,6 +89,12 @@ proc processContact(contact: Contact) =
     digSand(if firstKind == kDirt: contact.first else: contact.second)
 
   elif pair == {kPlayer, kDiamond}:
+    when defined(debugContacts):
+      echo "PAIR player-diamond at ",
+        (if firstKind == kDiamond: contact.first.getWorldPosition().fX
+         else: contact.second.getWorldPosition().fX), ", ",
+        (if firstKind == kDiamond: contact.first.getWorldPosition().fY
+         else: contact.second.getWorldPosition().fY)
     collectGem(if firstKind == kDiamond: contact.first else: contact.second)
 
   elif pair == {kPlayer, kExit}:
@@ -124,7 +130,7 @@ proc processContact(contact: Contact) =
       creatureObj = if firstKind == kCreature: contact.first
                     else: contact.second
     if boulder.getSpeed().fY > CrushYSpeed:
-      creatures.explodeCreature(creatures.findCreature(creatureObj))
+      creatures.explodeCreature(creatureObj)
 
   elif pair == {kBoulder, kDirt} or pair == {kBoulder, kWall} or
       pair == {kBoulder, kBoulder}:

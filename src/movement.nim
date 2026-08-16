@@ -15,6 +15,8 @@ var
   ## When set (startup test), replaces live input.
   currentAnim = ""
   digAnimTimer: float32 = 0.0
+  animSawDig* = false
+  ## Set when the dig swing animation has been triggered at least once.
 
 proc clampAxis(value: float32): float32 =
   ## Applies the dead zone to an analog stick axis.
@@ -60,7 +62,11 @@ proc boulderAhead(dx: float32): bool =
 proc playAnim(animName: string) =
   if player != nil and currentAnim != animName:
     currentAnim = animName
-    discard player.setCurrentAnim(animName.cstring)
+    if animName == "Dig":
+      animSawDig = true
+    let status = player.setCurrentAnim(animName.cstring)
+    when defined(debugAnim):
+      echo "ANIM -> ", animName, " status=", status
 
 proc updatePlayer*(deltaTime: float32) =
   ## Applies movement, digging, animation and push feedback.
@@ -77,16 +83,17 @@ proc updatePlayer*(deltaTime: float32) =
   when defined(testForceMove):
     var force = newVector(dx * 9000.0, 0.0, 0.0)
     discard player.applyForce(addr force, nil)
-
-  let digBefore = dirts.len
+  world.dugThisFrame = 0
   digAround(player.getWorldPosition(), dx, dy)
-  # Animation state machine: brief dig swing when digging, run while
-  # moving, idle otherwise.
+  let dug = world.dugThisFrame > 0
+
+  # Animation state machine: dig swing while digging, run while moving,
+  # idle otherwise.
   if digAnimTimer > 0.0:
     digAnimTimer -= deltaTime
     if digAnimTimer <= 0.0 and dx == 0.0 and dy == 0.0:
       playAnim("Idle")
-  if dirts.len < digBefore and digAnimTimer <= 0.0:
+  if dug and digAnimTimer <= 0.0:
     # 3 frames at ~0.12s; retriggers every frame the player keeps
     # digging, so the swing loops for the whole dig.
     digAnimTimer = 0.36

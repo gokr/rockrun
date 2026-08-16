@@ -83,13 +83,11 @@ def level1():
     rng = random.Random(41)
     g = make_level(w, h)
     reserved = set()
-    # start pocket top-left: guaranteed corridor of dirt cols 4-8 with a gem at col 7
+    # start pocket top-left: corridor of dirt cols 4-8 for scripted tests
     ((px, py), (ex, ey)) = (2, 2), (36, 19)
     carve(g, 1, 1, 3, 1)          # elbow room above start
     g[py][px] = START
     reserved |= {(x, py) for x in range(1, 9)} | {(px, py), (ex, ey)}
-    g[2][7] = GEM                 # startup-test gem: dig straight right
-    reserved.add((7, 2))
     # open shaft for the startup-test boulder drop (cols 29-31, rows 2..6)
     carve(g, 29, 2, 31, 6)
     # caverns lower half - candidates for unearthing

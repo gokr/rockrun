@@ -29,18 +29,61 @@ const
   StartupTestFrameCount = 5
 
 type
+  TestActionKind* = enum
+    taMove
+    taSpawnBoulder
+    taSpawnGem
+    taSpawnCreature
+    taExplodeCreature
+    taFakeQuota
+    taTeleport
+    taScreenshot
+    taFinish
+
+  TestAction* = object
+    ## One scripted scenario step, executed when test.time reaches `at`.
+    at*: float32
+    kind*: TestActionKind
+    dx*, dy*: float32
+    duration*: float32
+    cx*, cy*: int
+    config*: string
+
   TestScript = object
     ## Scripted in-engine verification used with --startup-test.
     active: bool
     time: float32
-    boulderSpawned: bool
     boulder: ptr orxOBJECT
     boulderSpawnY: float32
-    midShotTaken: bool
-    evaluated: bool
-    exitTestStarted: bool
-    exitTestDone: bool
+    spawnedCreature: ptr orxOBJECT
+    explodedGemCount: int
+    collectedBeforeExit: int
+    moveUntil: float32
+    exitTeleported: bool
+    completed: bool
+    finished: bool
     failures: seq[string]
+
+const
+  ## The startup test scenario: gravity drop, scripted dig/collect run,
+  ## creature explosion regression, exit completion into cave 2.
+  Scenario: seq[TestAction] = @[
+    TestAction(at: 1.0, kind: taSpawnBoulder, cx: 30, cy: 2),
+    TestAction(at: 1.2, kind: taMove, dx: 1.0, dy: 0.0, duration: 6.3),
+    TestAction(at: 2.5, kind: taSpawnGem, cx: 14, cy: 2),
+    TestAction(at: 3.0, kind: taScreenshot),
+    TestAction(at: 6.5, kind: taSpawnCreature, config: "Firefly",
+               cx: 31, cy: 14),
+    TestAction(at: 6.5, kind: taExplodeCreature),
+    TestAction(at: 8.0, kind: taScreenshot),
+    TestAction(at: 8.0, kind: taFakeQuota),
+    TestAction(at: 8.0, kind: taTeleport, cx: 35, cy: 19),
+    TestAction(at: 8.0, kind: taMove, dx: 1.0, dy: 0.0, duration: 4.0),
+    TestAction(at: 14.0, kind: taFinish)
+  ]
+
+var
+  scenarioIndex = 0
 
 var
   mainViewport: ptr orxVIEWPORT
@@ -53,6 +96,44 @@ var
   initializationSucceeded = false
   executionFailed = false
   test: TestScript
+
+proc testCheck(condition: bool; message: string) =
+  if not condition:
+    test.failures.add(message)
+    echo "Rockrun test failed: ", message
+
+proc runFinalChecks() =
+  testCheck(test.boulder != nil, "startup boulder was not spawned")
+  if test.boulder != nil:
+    let fellBy = test.boulder.getWorldPosition().fY - test.boulderSpawnY
+    testCheck(fellBy > 100.0,
+      fmt"startup boulder fell only {fellBy:.1} units")
+  testCheck(gs.dirtDug >= 6,
+    fmt"player dug only {gs.dirtDug} sand blocks")
+  testCheck(test.collectedBeforeExit >= 1,
+    "player did not collect the corridor diamond")
+  testCheck(gs.score >= gs.diamondScore,
+    fmt"score too low for a diamond pickup: {gs.score}")
+  testCheck(movement.animSawDig,
+    "the dig swing animation never triggered while digging")
+  testCheck(test.explodedGemCount == world.SubGrid * world.SubGrid,
+    fmt"creature explosion spawned {test.explodedGemCount} gems")
+  testCheck(test.completed,
+    "player could not complete the cave through the exit")
+  testCheck(gs.levelIndex == 1,
+    fmt"the second cave did not load (levelIndex={gs.levelIndex})")
+  testCheck(gs.phase in {phIntro, phPlaying},
+    fmt"unexpected phase after completing cave: {gs.phase}")
+  var cameraPosition: orxVECTOR
+  discard getPosition(mainCamera, addr cameraPosition)
+  testCheck(abs(cameraPosition.fX) <= worldMaxX and
+            abs(cameraPosition.fY) <= worldMaxY,
+    "camera left the cave bounds")
+  # Cave 2 is loaded and its creatures spawned: capture them.
+  discard screenshots.takeScreenshot()
+  if test.failures.len == 0:
+    echo "Rockrun engine checks passed"
+    echo "Rockrun completion checks passed"
 
 let startupTest = "--startup-test" in commandLineParams()
 
@@ -126,18 +207,14 @@ proc updateCamera(deltaTime: float32) =
 
   discard setPosition(mainCamera, addr cameraPosition)
 
-proc testCheck(condition: bool; message: string) =
-  if not condition:
-    test.failures.add(message)
-    echo "Rockrun test failed: ", message
-
 const
   ## dt multiplier used only for the scripted test, to compensate for the
   ## clock clamp (~1/240s) making sim time much slower than wall time.
   TestClockMultiplier = (if defined(testSlow): 1.0 else: 3.0).float32
 
 proc runTestScript(deltaTime: float32) =
-  ## Scripted physics/digging/collection verification.
+  ## Executes the scripted scenario: an ordered action table whose steps
+  ## fire when test.time reaches their timestamps.
   when defined(debugHeartbeat):
     let previousSecond = int(test.time)
     test.time += deltaTime
@@ -150,106 +227,86 @@ proc runTestScript(deltaTime: float32) =
            " pos=(", playerPosition.fX, ",", playerPosition.fY, ") v=(",
            playerSpeed.fX, ",", playerSpeed.fY, ") in=(",
            inputX, ",", inputY, ") dirts=", world.dirts.len
-      if test.boulder != nil:
-        let boulderBody = cast[ptr orxBODY](
-          internal_orxObject_GetStructure(test.boulder, STRUCTURE_ID_BODY))
-        let playerBody = cast[ptr orxBODY](
-          internal_orxObject_GetStructure(world.player, STRUCTURE_ID_BODY))
-        echo "BODY player: nil=", playerBody == nil, " dyn=",
-             (if playerBody == nil: false else: isDynamic(playerBody) != orxFALSE),
-             " boulder: nil=", boulderBody == nil, " dyn=",
-             (if boulderBody == nil: false else: isDynamic(boulderBody) != orxFALSE)
-        var spwnBodyPosition: orxVECTOR
-        let spwnBody = cast[ptr orxBODY](
-          internal_orxObject_GetStructure(test.boulder, STRUCTURE_ID_BODY))
-        discard getPosition(spwnBody, addr spwnBodyPosition)
-        if playerBody != nil:
-          var bodyPosition: orxVECTOR
-          discard getPosition(playerBody, addr bodyPosition)
-          echo "BODY pos ", bodyPosition.fX, ",", bodyPosition.fY,
-               " bobj pos ", spwnBodyPosition.fX, ",", spwnBodyPosition.fY,
-               " mass=", world.player.getMass(),
-               " bmass=", test.boulder.getMass()
   else:
     test.time += deltaTime
-  if not test.boulderSpawned:
+
+  if scenarioIndex == 0:
     ## Triple sim speed while verifying; restored on completion.
     setEnginePaused(false)
     discard setModifier(coreClock, CLOCK_MODIFIER_MULTIPLY,
                         TestClockMultiplier)
+
   when defined(testNoScript):
-    if true: return
-  when not defined(testNoBoulder):
-    if not test.boulderSpawned and test.time >= 1.0:
-      test.boulder = world.spawnBoulderAt(30, 2)
+    return
+
+  ## Due actions
+  while scenarioIndex < Scenario.len and
+      test.time >= Scenario[scenarioIndex].at:
+    let action = Scenario[scenarioIndex]
+    inc scenarioIndex
+    case action.kind
+    of taMove:
+      movement.movementOverride = some((action.dx, action.dy))
+      test.moveUntil = test.time + action.duration
+    of taSpawnBoulder:
+      test.boulder = world.spawnBoulderAt(action.cx, action.cy)
       if test.boulder != nil:
         test.boulderSpawnY = test.boulder.getWorldPosition().fY
-      test.boulderSpawned = true
-  when not defined(testNoMove):
-    if test.time >= 1.2 and test.time < 7.5:
-      movement.movementOverride = some((1.0'f32, 0.0'f32))
-    elif test.time >= 7.5:
-      movement.movementOverride = options.none(tuple[x, y: float32])
-
-  if not test.midShotTaken and test.time >=
-      (if defined(debugHud): 0.6 else: 3.0):
-    test.midShotTaken = true
-    discard screenshots.takeScreenshot()
-
-  if not test.evaluated and test.time >= 8.0:
-    test.evaluated = true
-    testCheck(test.boulder != nil, "startup boulder was not spawned")
-    if test.boulder != nil:
-      let fellBy = test.boulder.getWorldPosition().fY - test.boulderSpawnY
-      testCheck(fellBy > 100.0,
-        fmt"startup boulder fell only {fellBy:.1} units")
-    testCheck(gs.dirtDug >= 6,
-      fmt"player dug only {gs.dirtDug} sand blocks")
-    testCheck(gs.collected >= 1,
-      "player did not collect the corridor diamond")
-    testCheck(gs.score >= gs.diamondScore,
-      fmt"score too low for a diamond pickup: {gs.score}")
-    testCheck(gs.phase == phPlaying,
-      fmt"unexpected game phase during scripted run: {gs.phase}")
-    var cameraPosition: orxVECTOR
-    discard getPosition(mainCamera, addr cameraPosition)
-    testCheck(abs(cameraPosition.fX) <= worldMaxX and
-              abs(cameraPosition.fY) <= worldMaxY,
-      "camera left the cave bounds")
-    discard screenshots.takeScreenshot()
-    if test.failures.len == 0:
-      echo "Rockrun engine checks passed"
-
-  if test.evaluated and not test.exitTestStarted:
-    ## Phase 2: completion flow. Fake a fully mined quota, teleport next
-    ## to the exit and walk in; the level-complete phase should fire.
-    test.exitTestStarted = true
-    gs.collected = gs.needed
-    discard world.player.setWorldPosition(world.cellWorld(35, 19))
-
-  if test.exitTestStarted and not test.exitTestDone:
-    movement.movementOverride = some((1.0'f32, 0.0'f32))
-    if gs.levelCompleted or gs.phase == phComplete:
-      test.exitTestDone = true
-      movement.movementOverride = options.none(tuple[x, y: float32])
-      echo "Rockrun completion checks passed"
-    elif test.time >= 12.0:
-      test.exitTestDone = true
-      movement.movementOverride = options.none(tuple[x, y: float32])
-      testCheck(false, "player could not complete the cave through the exit")
+    of taSpawnGem:
+      ## Drops a diamond right in front of the player, inside the corridor
+      ## that has already been dug (spawning inside solid sand would eject
+      ## the gem violently).
+      let gem = objectCreateFromConfig("Diamond")
+      if gem != nil:
+        let playerPosition = world.player.getWorldPosition()
+        let (px, py) = world.cellOf(playerPosition)
+        let position = world.cellWorld(px + 1, py)
+        discard gem.setPosition(
+          newVector(position.fX, position.fY, world.GemZ))
+        discard gem.addFX("SparkleFX")
+        world.gems.add(gem)
+        when defined(debugContacts):
+          echo "SPAWNED test gem at ", position.fX, ",", position.fY,
+               " player at ", playerPosition.fX, ",", playerPosition.fY
+    of taSpawnCreature:
+      test.spawnedCreature = creatures.spawnCreature(
+        action.config, action.cx, action.cy,
+        (if action.config == "Firefly": ckFirefly else: ckButterfly))
+    of taExplodeCreature:
+      ## Regression: exploding a creature must leave no dangling record
+      ## (a falling boulder once crashed updateCreatures this way).
+      let gemCount = world.gems.len
+      creatures.explodeCreature(test.spawnedCreature)
+      test.explodedGemCount = world.gems.len - gemCount
+      testCheck(creatures.creatures.len == 0,
+        "creature record still tracked after explosion")
+    of taFakeQuota:
+      ## Capture the collected-gem count before the level resets: the
+      ## final checks run after cave 2 has loaded.
+      test.collectedBeforeExit = gs.collected
+      gs.collected = gs.needed
+    of taTeleport:
+      test.exitTeleported = true
+      discard world.player.setWorldPosition(
+        world.cellWorld(action.cx, action.cy))
+    of taScreenshot:
+      discard screenshots.takeScreenshot()
+    of taFinish:
+      runFinalChecks()
+      test.finished = true
       setEnginePaused(false)
       discard eventSendShort(EVENT_TYPE_SYSTEM, SYSTEM_EVENT_CLOSE.orxU32)
 
-  if test.exitTestDone and test.time >= 13.5:
-    testCheck(gs.levelIndex == 1,
-              fmt"the second cave did not load (levelIndex={gs.levelIndex})")
-    testCheck(gs.phase in {phIntro, phPlaying},
-              fmt"unexpected phase after completing cave: {gs.phase}")
-    if test.failures.len == 0:
-      # Cave 2 is loaded and its firefly/butterfly spawned: capture them.
-      discard screenshots.takeScreenshot()
-    setEnginePaused(false)
-    discard eventSendShort(EVENT_TYPE_SYSTEM, SYSTEM_EVENT_CLOSE.orxU32)
+  ## Movement override lifetime
+  if movement.movementOverride.isSome and test.time >= test.moveUntil and
+      not test.completed:
+    movement.movementOverride = options.none(tuple[x, y: float32])
+
+  ## Completion detection while walking into the exit
+  if test.exitTeleported and not test.completed and
+      (gs.levelCompleted or gs.phase == phComplete):
+    test.completed = true
+    movement.movementOverride = options.none(tuple[x, y: float32])
 
 proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
   if isActive("Quit"):

@@ -79,20 +79,27 @@ proc spawnCreature*(configName: string; cx, cy: int;
   ## Spawns a creature at a cell center, initially moving right.
   result = objectCreateFromConfig(configName)
   if result != nil:
-    discard result.setPosition(world.cellWorld(cx, cy))
+    let position = world.cellWorld(cx, cy)
+    discard result.setPosition(
+      newVector(position.fX, position.fY, world.CreatureZ))
     discard result.addFX("SparkleFX")
     creatures.add(Creature(obj: result, kind: kind, cellX: cx, cellY: cy,
                            dirX: 1, dirY: 0, targetX: cx + 1, targetY: cy,
                            speed: (if kind == ckFirefly: FireflySpeed
                                    else: ButterflySpeed)))
 
-proc explodeCreature*(creature: Creature) =
+proc explodeCreature*(gameObject: ptr orxOBJECT) =
   ## A falling boulder crushed the creature: burst into nine diamonds.
-  if creature.obj == nil or world.isDestroyed(creature.obj):
+  ## The creature record is removed from tracking so later frames never
+  ## dereference the destroyed object.
+  if gameObject == nil or world.isDestroyed(gameObject):
     return
-  let position = creature.obj.getWorldPosition()
+  for index in countdown(creatures.high, 0):
+    if creatures[index].obj == gameObject:
+      creatures.delete(index)
+  let position = gameObject.getWorldPosition()
   world.spawnBurst("GemSparkle", position, 5)
-  discard creature.obj.addSound("ClinkSound")
+  discard gameObject.addSound("ClinkSound")
   for offset in world.SubOffsets:
     let spot = newVector(position.fX + offset.x, position.fY + offset.y, 0.0)
     let (cx, cy) = world.cellOf(spot)
@@ -105,14 +112,8 @@ proc explodeCreature*(creature: Creature) =
       discard gem.setPosition(spawn)
       discard gem.addFX("SparkleFX")
       world.gems.add(gem)
-  world.destroyObject(creature.obj)
+  world.destroyObject(gameObject)
   gs.hudDirty = true
-
-proc findCreature*(gameObject: ptr orxOBJECT): Creature =
-  for creature in creatures:
-    if creature.obj == gameObject:
-      return creature
-  result = Creature(obj: nil)
 
 proc spawnPending*() =
   ## Instantiates all creatures recorded by world level parsing.
