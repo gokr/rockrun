@@ -11,14 +11,11 @@ const
   ## Impact speeds for environmental feedback.
   ThudMinSpeed* = 330'f32
   ClinkMinSpeed* = 230'f32
-  ## Vertical momentum (body mass x fall speed) that crushes a hero or
-  ## creature. Mass scales with the boulder's sphere radius, so a huge
-  ## boulder crushes from a small drop while a pebble needs a long fall.
-  CrushMomentum* = 20.0'f32
-  ## Minimum relative closing speed for a crush: the boulder must
-  ## approach the hero faster than the hero can move, so pushing or
-  ## ramming a boulder can never count as an impact.
-  CrushMinClosing* = 250.0'f32
+  ## Approach momentum (body mass x closing speed) that crushes a hero
+  ## or creature. Mass scales with the boulder's sphere radius, so a
+  ## huge boulder crushes from a tiny drop while a pebble needs a real
+  ## one.
+  CrushMomentum* = 10.0'f32
   ## Phase durations in seconds.
   IntroTime* = 1.7'f32
   DyingTime* = 1.6'f32
