@@ -227,11 +227,14 @@ var
   countdownStep = 3
 
 proc startCountdown() =
-  ## Round-start beeps: 3, 2, 1, then a long final beep and GO.
+  ## Round-start beeps: 3, 2, 1, then a long final beep and GO. Every
+  ## beat is CountdownBeat long (the first beat starts immediately, so
+  ## the initial phase timer is overridden to one beat).
   countdownStep = 3
-  ui.showMessage("3", CountdownBeat)
+  ui.showMessage("3", CountdownBeat + 0.1)
   discard audioObject.addSound("BeepSound")
   enterPhase(phCountdown)
+  gs.phaseTimer = CountdownBeat
 
 proc reloadLevel() =
   if world.loadWorld(gs.levelIndex):
@@ -582,7 +585,8 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
       if countdownStep > 1:
         dec countdownStep
         gs.phaseTimer = CountdownBeat
-        ui.showMessage($countdownStep, CountdownBeat)
+        # +0.1 keeps the number visible until the next beat replaces it.
+        ui.showMessage($countdownStep, CountdownBeat + 0.1)
         discard audioObject.addSound("BeepSound")
       else:
         ui.showMessage("GO!", 0.8)

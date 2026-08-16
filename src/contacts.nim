@@ -129,7 +129,7 @@ proc processContact(contact: Contact) =
                 else: contact.second
       heroObj = if firstKind == kPlayer: contact.first
                 else: contact.second
-    if boulder.getSpeed().fY > CrushYSpeed:
+    if boulder.getMass() * boulder.getSpeed().fY > CrushMomentum:
       killHero(heroObj, "Crushed by a boulder")
     elif impactSpeed(boulder) > ThudMinSpeed and
         gs.worldClockTime - gs.lastThud >= ThudInterval:
@@ -162,7 +162,7 @@ proc processContact(contact: Contact) =
                 else: contact.second
       creatureObj = if firstKind == kCreature: contact.first
                     else: contact.second
-    if boulder.getSpeed().fY > CrushYSpeed:
+    if boulder.getMass() * boulder.getSpeed().fY > CrushMomentum:
       creatures.explodeCreature(creatureObj)
 
   elif pair == {kBoulder, kDirt} or pair == {kBoulder, kWall} or

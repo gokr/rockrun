@@ -11,8 +11,10 @@ const
   ## Impact speeds for environmental feedback.
   ThudMinSpeed* = 330'f32
   ClinkMinSpeed* = 230'f32
-  ## A boulder moving downwards faster than this crushes the player.
-  CrushYSpeed* = 240'f32
+  ## Vertical momentum (body mass x fall speed) that crushes a hero or
+  ## creature. Mass scales with the boulder's sphere radius, so a huge
+  ## boulder crushes from a small drop while a pebble needs a long fall.
+  CrushMomentum* = 20.0'f32
   ## Phase durations in seconds.
   IntroTime* = 1.7'f32
   DyingTime* = 1.6'f32

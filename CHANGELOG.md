@@ -59,6 +59,11 @@ Local co-op multiplayer.
   turn was preferred over straight, which made creatures zigzag across
   wide shafts and orbit in small squares in open halls instead of
   following the walls.
+- Boulder crush is now momentum-based (mass x fall speed) instead of
+  plain speed: a huge boulder crushes from a small drop, a pebble needs
+  a long fall - size now matters for "brutal" rocks.
+- Countdown beats are all equal (0.5s); the first beat used to be 1.5s
+  and the "3" text vanished mid-beat, leaving a blank pause.
 
 ## [1.0.0] - 2026-08-16
 
