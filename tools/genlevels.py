@@ -71,6 +71,14 @@ def emit(name, section, g, needed, time_limit):
     for (x, y) in spawns:
         assert g[y - 1][x] not in BOULDER_ANY and g[y - 1][x] != GEM, \
             (name, x, y)
+    # creatures must spawn on open cells (physics would eject them from
+    # inside solid dirt, breaking their wall-hugging steering)
+    for y in range(h):
+        for x in range(w):
+            if g[y][x] in ('f', 'b'):
+                assert g[y][x - 1] == EMPTY or g[y][x + 1] == EMPTY or \
+                    g[y - 1][x] == EMPTY or g[y + 1][x] == EMPTY, \
+                    (name, x, y, 'creature enclosed in dirt')
     # nothing may start mid-air
     for y in range(h - 2):
         for x in range(w):
@@ -211,7 +219,7 @@ def level3():
     g[h - 4][w // 2 + 2] = BOULDER
     reserved |= {(w // 2 - 2, h - 4), (w // 2 + 2, h - 4)}
     # creatures: firefly in the upper vault, butterfly in the lower mine
-    g[14][33] = 'f'
+    g[10][34] = 'f'
     g[21][24] = 'b'
     bands = [(3, 4, 19, 10), (28, 6, 44, 7), (7, 13, 19, 13), (28, 13, 41, 13),
              (9, 20, 39, 20), (21, 14, 26, 14), (2, 16, 17, 19),

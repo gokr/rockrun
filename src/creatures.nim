@@ -24,8 +24,9 @@ type
     dirX*, dirY*: int
     targetX*, targetY*: int
     speed*: float32
-    lastDist*: float32
-    stuckTime*: float32
+    stuckTime*: float32 ## accumulated stall time (see StuckLimit)
+    legStartDist*: float32 ## distance to target at the start of the leg
+    legTime*: float32 ## time since the leg baseline was taken
 
 var
   creatures*: seq[Creature]
@@ -34,6 +35,13 @@ const
   FireflySpeed* = 90.0'f32
   ButterflySpeed* = 115.0'f32
   ArrivalDistance = 6.0'f32
+  ## Stuck detection: the distance to the target cell must shrink by at
+  ## least StuckMinProgress px per StuckWindow seconds. Windowed and
+  ## time-based on purpose - per-frame thresholds break at high clock
+  ## rates (the core clock runs at display frequency, e.g. 240Hz).
+  StuckWindow = 0.35'f32
+  StuckMinProgress = 4.0'f32
+  StuckLimit = 0.5'f32
 
 proc blockedAt*(cx, cy: int): bool =
   ## True when a cell stops a creature: outside, wall, or any sand.
@@ -140,33 +148,43 @@ proc updateCreatures*(deltaTime: float32) =
     let dy = target.fY - position.fY
     let dist = abs(dx) + abs(dy)
 
-    # Stuck detection: if we are not arriving and made no progress
-    # towards the target for a while, the body is probably wedged or
-    # sliding along a wall - pick a new direction.
-    if dist > ArrivalDistance:
-      if dist >= creature.lastDist - 1.0'f32:
-        creature.stuckTime += deltaTime
+    # Stuck detection over a time window: a healthy leg towards the target
+    # cell shrinks the distance steadily; stalling against a boulder or a
+    # wall edge does not. Frame-rate independent.
+    creature.legTime += deltaTime
+    if creature.legTime >= StuckWindow:
+      creature.legTime = 0.0
+      if dist >= creature.legStartDist - StuckMinProgress:
+        creature.stuckTime += StuckWindow
       else:
         creature.stuckTime = 0.0
-      if creature.stuckTime > 0.5:
-        creature.stuckTime = 0.0
-        chooseDirection(creature)
-    creature.lastDist = dist
+      creature.legStartDist = dist
 
     if dist <= ArrivalDistance:
       creature.cellX = creature.targetX
       creature.cellY = creature.targetY
       chooseDirection(creature)
+      creature.stuckTime = 0.0
       let next = world.cellWorld(creature.targetX, creature.targetY)
       let ndx = next.fX - position.fX
       let ndy = next.fY - position.fY
       let length = max(1.0'f32, hypot(ndx, ndy))
       discard creature.obj.setSpeed(newVector(
         ndx / length * creature.speed, ndy / length * creature.speed, 0.0))
+      # Baseline for the new leg: distance to the freshly chosen target.
+      creature.legStartDist = abs(ndx) + abs(ndy)
+      creature.legTime = 0.0
     else:
-      let length = max(1.0'f32, hypot(dx, dy))
+      if creature.stuckTime > StuckLimit:
+        creature.stuckTime = 0.0
+        chooseDirection(creature)
+      # Aim at the (possibly re-steered) target.
+      let aim = world.cellWorld(creature.targetX, creature.targetY)
+      let adx = aim.fX - position.fX
+      let ady = aim.fY - position.fY
+      let length = max(1.0'f32, hypot(adx, ady))
       discard creature.obj.setSpeed(newVector(
-        dx / length * creature.speed, dy / length * creature.speed, 0.0))
+        adx / length * creature.speed, ady / length * creature.speed, 0.0))
 
 proc clearCreatures*() =
   ## Drops creature tracking before a world reload destroys the objects.
