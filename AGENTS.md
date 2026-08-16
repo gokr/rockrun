@@ -67,8 +67,10 @@ Also re-generate levels after changing `tools/genlevels.py`:
   game, runs the startup test and reports verdicts plus fresh screenshots.
 - `.pi/skills/rockrun-dev/` — pi skill bundling this workflow (build/test
   loop, ORX config facts, multiplayer worktree conventions).
-- A generic ORX config linter (`orx_ini_validate`) lives globally in pi
-  (`~/.pi/agent/extensions/`); it works on any ORX project.
+- A generic ORX config linter (`orx_ini_validate`) and an ORX/Norx
+  documentation lookup (`orx_docs`, local source + wiki + doxygen)
+  live globally in pi (`~/.pi/agent/extensions/`); both work on any
+  ORX project.
 
 ## Conventions and hard-won facts
 

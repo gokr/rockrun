@@ -227,6 +227,7 @@ proc updateCamera(deltaTime: float32) =
     cameraPosition.fY += shakeY
 
   discard setPosition(mainCamera, addr cameraPosition)
+  ui.positionHud(cameraPosition.fX, cameraPosition.fY)
 
 const
   ## dt multiplier used only for the scripted test, to compensate for the

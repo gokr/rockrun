@@ -14,6 +14,10 @@ var
   messageTimer, subMessageTimer: float32
   lastShownSeconds = -1
 
+  ## HUD objects positioned in screen space each frame (see
+  ## positionHud): offsets are screen pixels from the top-left corner.
+  hudItems: seq[tuple[obj: ptr orxOBJECT, x, y: float32]]
+
 proc initUi*(): bool =
   ## Creates all HUD objects from config.
   scoreObject = objectCreateFromConfig("HudScore")
@@ -29,9 +33,25 @@ proc initUi*(): bool =
       subMessageObject == nil:
     echo "Could not create the HUD"
     return false
+  hudItems = @[
+    (scoreObject, 20.0'f32, 18.0'f32),
+    (diamondsObject, 420.0'f32, 18.0'f32),
+    (timeObject, 760.0'f32, 18.0'f32),
+    (livesObject, 1050.0'f32, 18.0'f32),
+    (levelObject, 20.0'f32, 84.0'f32),
+    (messageObject, 640.0'f32, 300.0'f32),
+    (subMessageObject, 640.0'f32, 400.0'f32)
+  ]
   discard messageObject.enable(false)
   discard subMessageObject.enable(false)
   result = true
+
+proc positionHud*(cameraX, cameraY: float32) =
+  ## Places every HUD object in screen space relative to the camera, on a
+  ## world Z above everything else so it always renders in front.
+  for item in hudItems:
+    discard item.obj.setPosition(newVector(
+      cameraX + item.x - 640.0, cameraY + item.y - 360.0, 2.0))
 
 proc showMessage*(text: string; duration: float32) =
   ## Big centered headline, hidden after `duration` (<= 0 keeps it).
