@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HUD renders through a dedicated camera-space viewport (HudViewport) so
   text always draws on top; per-player lives lines replace the single
   LIVES counter; hero animation strips use one character consistently.
+- Creatures pressed against sand are dazed: when the blocking sand is
+  dug away they take a beat to wake up (no movement, no kills), so
+  digging into a hidden firefly gives you a reaction window instead of
+  an instant death - classic BD behavior.
 
 ## [1.0.0] - 2026-08-16
 

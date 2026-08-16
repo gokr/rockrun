@@ -27,6 +27,8 @@ type
     stuckTime*: float32 ## accumulated stall time (see StuckLimit)
     legStartDist*: float32 ## distance to target at the start of the leg
     legTime*: float32 ## time since the leg baseline was taken
+    wakeTimer*: float32 ## daze after the blocking sand is dug away
+    wasTouchingSand*: bool ## pressed against sand (set by contacts)
 
 var
   creatures*: seq[Creature]
@@ -35,6 +37,10 @@ const
   FireflySpeed* = 90.0'f32
   ButterflySpeed* = 115.0'f32
   ArrivalDistance = 6.0'f32
+  ## How long a creature freed from sand (its blocking wall was dug
+  ## away) stays dazed: classic BD's reaction window when digging into
+  ## a hidden creature.
+  WakeTime = 0.4'f32
   ## Stuck detection: the distance to the target cell must shrink by at
   ## least StuckMinProgress px per StuckWindow seconds. Windowed and
   ## time-based on purpose - per-frame thresholds break at high clock
@@ -130,10 +136,35 @@ proc spawnPending*() =
     let kind = (if pending.config == "Firefly": ckFirefly else: ckButterfly)
     discard spawnCreature(pending.config, pending.x, pending.y, kind)
 
+proc markTouchingSand*(gameObject: ptr orxOBJECT) =
+  ## A physics contact pressed this creature against sand (set while the
+  ## contact queue is drained; consumed by updateCreatures).
+  for creature in creatures.mitems:
+    if creature.obj == gameObject:
+      creature.wasTouchingSand = true
+      return
+
+proc isDazed*(gameObject: ptr orxOBJECT): bool =
+  ## True while the creature is in the wake-up daze (it can neither move
+  ## nor kill).
+  for creature in creatures:
+    if creature.obj == gameObject:
+      return creature.wakeTimer > 0.0
+  false
+
 proc updateCreatures*(deltaTime: float32) =
   ## Drives creature steering and smooth movement.
   for creature in creatures.mitems:
     if creature.obj == nil or world.isDestroyed(creature.obj):
+      continue
+    # Wake-up daze: pressed against sand keeps the daze alive; once the
+    # sand is dug away the timer runs out and the creature resumes.
+    if creature.wasTouchingSand:
+      creature.wakeTimer = WakeTime
+      creature.wasTouchingSand = false
+    if creature.wakeTimer > 0.0:
+      creature.wakeTimer = max(0.0'f32, creature.wakeTimer - deltaTime)
+      discard creature.obj.setSpeed(newVector(0.0, 0.0, 0.0))
       continue
     # If the current target became blocked (e.g. sand refined or a wall
     # neighbour carved), re-steer instead of pressing against it.

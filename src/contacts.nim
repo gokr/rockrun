@@ -129,9 +129,18 @@ proc processContact(contact: Contact) =
                     else: contact.second
       heroObj = if firstKind == kPlayer: contact.first
                 else: contact.second
-    world.killPlayer(world.playerOf(heroObj),
-      (if objectKind(creatureObj) == "Firefly": "Devoured by a firefly"
-       else: "Caught by a butterfly"))
+    if not creatures.isDazed(creatureObj):
+      # Dazed creatures (just dug out of their hiding wall) give the
+      # player a reaction beat instead of killing instantly.
+      world.killPlayer(world.playerOf(heroObj),
+        (if objectKind(creatureObj) == "Firefly": "Devoured by a firefly"
+         else: "Caught by a butterfly"))
+
+  elif pair == {kCreature, kDirt}:
+    # Pressed against sand: keeps the wake-up daze alive so digging the
+    # wall away never grants an instant kill.
+    creatures.markTouchingSand(
+      if firstKind == kCreature: contact.first else: contact.second)
 
   elif pair == {kBoulder, kCreature}:
     let
