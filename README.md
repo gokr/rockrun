@@ -133,6 +133,39 @@ Administrator (installs Chocolatey, Git, Nim, MinGW); `makeorxwindows.sh`
 builds the bundled `orx.dll` inside the VM. macOS builds ad-hoc sign the
 bundle (users right-click > Open on first launch).
 
+### Windows build prerequisites (Ubuntu host)
+
+Vagrant plus VirtualBox from the Oracle apt repository (Ubuntu's own
+`virtualbox` package is old and fails to build its kernel module on
+modern kernels - use the Oracle 7.2+ packages instead).
+
+```bash
+# 1. Vagrant (HashiCorp's apt repo)
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor \
+  -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] \
+https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
+  sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install vagrant
+
+# 2. VirtualBox from Oracle's apt repo (tested with 7.2.14)
+wget -q https://www.virtualbox.org/download/oracle_vbox_2016.asc -O- | \
+  sudo gpg --dearmor -o /usr/share/keyrings/oracle-virtualbox-2016.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/oracle-virtualbox-2016.gpg] \
+https://download.virtualbox.org/virtualbox/debian $(lsb_release -cs) contrib" | \
+  sudo tee /etc/apt/sources.list.d/virtualbox.list
+sudo apt update && sudo apt install virtualbox-7.2
+sudo modprobe vboxdrv
+
+# 3. Verify
+vagrant --version && vboxmanage --version
+```
+
+Then, once per machine: `vagrant up` boots the Windows 10 box (first run
+downloads ~5 GB) and `C:\vagrant\scripts\windows-setup.bat` must be run
+as Administrator inside the VM window. Afterwards `./makewindows.sh`
+builds orx.dll + rockrun.exe and packs the zip in one go.
+
 ### Installing appimagetool (Ubuntu)
 
 ```bash
