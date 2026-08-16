@@ -62,9 +62,11 @@ Local co-op multiplayer.
 - Boulder crush is now momentum-based (mass x fall speed) instead of
   plain speed: a huge boulder crushes from a small drop, a pebble needs
   a long fall - size now matters for "brutal" rocks.
-- Crush impact direction: the boulder's momentum is projected on the
-  contact normal, so a rock falling straight onto your head crushes,
-  while one grazing past your side does not.
+- Crush impact: uses the RELATIVE closing speed along the contact
+  normal, and only counts when the boulder approaches faster than the
+  hero can move - pushing or ramming boulders from any side is now
+  safe, while falls and fast rolls still crush (mass still matters: a
+  huge boulder crushes from a small drop, a pebble needs a long fall).
 - Digging no longer awards score (diamonds and time bonus only).
 - Respawn picks the nearest free cell: respawning on top of a teammate
   made the sprites overlap, which looked like the wrong player color.
