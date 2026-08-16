@@ -21,7 +21,7 @@ task test, "Run the scripted in-engine startup test suite":
   # binary must be called `rockrun` (it's gitignored).
   exec "nim c -o:rockrun src/rockrun.nim && ./rockrun -c test.ini --startup-test true"
 
-task test-mp, "Run the multiplayer startup test variant":
+task test_mp, "Run the multiplayer startup test variant":
   exec "nim c -o:rockrun src/rockrun.nim && ./rockrun -c test.ini --startup-test-mp true"
 
 task release, "Build a release binary against the optimized ORX library":

@@ -298,7 +298,6 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT;
   ## attributed to the digging hero.
   if gameObject == nil or isDestroyed(gameObject):
     return
-    return
   var digger = digger
   if digger == nil:
     digger = playerObj()
