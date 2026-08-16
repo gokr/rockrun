@@ -155,6 +155,17 @@ proc isDestroyed*(gameObject: ptr orxOBJECT): bool =
   ## contact handling from dereferencing freed ORX objects.
   result = gameObject == nil or cast[pointer](gameObject) in destroyedObjects
 
+proc structureValid(gameObject: ptr orxOBJECT): bool =
+  ## Cheap validity check on an ORX object pointer: its structure GUID
+  ## must still identify a live structure (freed memory gets reused with
+  ## the deleted magic tag or another structure id).
+  if gameObject == nil:
+    return false
+  let guid = cast[ptr orxSTRUCTURE](gameObject).u64GUID
+  result = (guid and STRUCTURE_GUID_MASK_STRUCTURE_ID) <
+      STRUCTURE_ID_NUMBER.uint64 and
+      guid != STRUCTURE_GUID_MAGIC_TAG_DELETED
+
 proc removeTracked(gameObject: ptr orxOBJECT) =
   for tracking in [addr world.boulders, addr world.gems, addr world.dirts]:
     let index = tracking[].find(gameObject)
@@ -166,6 +177,21 @@ proc destroyObject*(gameObject: ptr orxOBJECT) =
     return
   if isDestroyed(gameObject):
     # Already destroyed this frame (stale entry in a tracking list).
+    return
+  if not structureValid(gameObject):
+    # A stale pointer reached the teardown path. Log the offender and
+    # scrub it from tracking lists instead of crashing ORX.
+    var where = ""
+    if world.boulders.find(gameObject) >= 0:
+      where.add(" boulders")
+    if world.gems.find(gameObject) >= 0:
+      where.add(" gems")
+    if world.dirts.find(gameObject) >= 0:
+      where.add(" dirts")
+    if wallObjects.find(gameObject) >= 0:
+      where.add(" walls")
+    echo "Stale ORX object ", cast[uint](gameObject), " in:", where
+    removeTracked(gameObject)
     return
   removeTracked(gameObject)
   destroyedObjects.incl(cast[pointer](gameObject))
@@ -180,7 +206,7 @@ proc spawnBurst*(configName: string; position: orxVECTOR; count = 3) =
 
 proc destroySmallSand*(gameObject: ptr orxOBJECT) =
   ## Digs out a fine sand grain: dust, sound and score.
-  if gameObject == nil:
+  if gameObject == nil or isDestroyed(gameObject):
     return
   let position = gameObject.getWorldPosition()
   # Every other dug grain kicks up dust, so digging isn't a dust storm.
@@ -344,16 +370,24 @@ proc spawnBoulderAt*(cx, cy: int): ptr orxOBJECT =
     world.boulders.add(result)
 
 proc clearWorld*() =
-  ## Deletes every spawned object. The concatenated copy is needed because
-  ## destruction removes objects from these very sequences.
+  ## Deletes every spawned object. The concatenated copy is deduplicated
+  ## (a pointer could live in several tracking lists) because destruction
+  ## removes objects from these very sequences.
   var pass = newSeqOfCap[ptr orxOBJECT](
     boulders.len + gems.len + dirts.len + wallObjects.len)
-  pass.add(boulders)
-  pass.add(gems)
-  pass.add(dirts)
-  pass.add(wallObjects)
+  var seen = initHashSet[pointer]()
+  for batch in [boulders, gems, dirts, wallObjects]:
+    for gameObject in batch:
+      if cast[pointer](gameObject) in seen:
+        continue
+      seen.incl(cast[pointer](gameObject))
+      pass.add(gameObject)
   for gameObject in pass:
     destroyObject(gameObject)
+  # Fine grains aren't in the teardown lists - destroy them explicitly
+  # so no bodies leak into the next cave.
+  for grain in fineGrains:
+    destroyObject(grain)
   boulders.setLen(0)
   gems.setLen(0)
   dirts.setLen(0)

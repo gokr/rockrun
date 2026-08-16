@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Teardown hardening: `destroyObject` validates ORX structure pointers and
+  scrubs stale entries instead of crashing, the level-teardown pass is
+  deduplicated, and fine sand grains are now explicitly destroyed on
+  level reload (previously they leaked into the next cave).
 - Big/huge boulders now spawn inside pre-carved hollow pockets instead of
   overlapping the sand lattice - no more deep-penetration "rock pops" when
   digging around them.
