@@ -24,8 +24,7 @@ if not exist "%BUILD_ROOT%\norx\.git" (
     git clone https://github.com/tankfeud/norx.git norx
     if %errorLevel% neq 0 (
         echo ERROR: failed to clone norx
-        pause
-        exit /b 1
+            exit /b 1
     )
 ) else (
     cd /d "%BUILD_ROOT%\norx"
@@ -39,8 +38,7 @@ if not exist "orx\.git" (
     git submodule update --init --recursive
     if %errorLevel% neq 0 (
         echo ERROR: failed to init ORX submodule
-        pause
-        exit /b 1
+            exit /b 1
     )
 )
 
@@ -50,7 +48,6 @@ REM  Extern version required by this ORX revision
 for /f "delims=" %%v in (.extern) do set EXTERN_VER=%%v
 if "%EXTERN_VER%"=="" (
     echo ERROR: could not read .extern version
-    pause
     exit /b 1
 )
 
@@ -72,8 +69,7 @@ REM The primary host orx-project org is currently down - use the
         )
         if %errorLevel% neq 0 (
             echo ERROR: failed to download ORX extern zip
-            pause
-            exit /b 1
+                    exit /b 1
         )
     ) else (
         echo ORX extern %EXTERN_VER% found in cache.
@@ -89,8 +85,7 @@ REM The primary host orx-project org is currently down - use the
             echo ERROR: premake4.exe missing after extraction - bad zip?
             echo Deleting the cache zip so the next run re-downloads.
             del "cache\%EXTERN_VER%.zip" 2>nul
-            pause
-            exit /b 1
+                    exit /b 1
         )
     ) else (
         echo ORX extern already extracted.
@@ -105,8 +100,7 @@ REM The primary host orx-project org is currently down - use the
         choco install mingw -y --no-progress
         if %errorLevel% neq 0 (
             echo ERROR: failed to install MinGW
-            pause
-            exit /b 1
+                    exit /b 1
         )
     )
     set "PATH=%ALLUSERSPROFILE%\chocolatey\lib\mingw\tools\install\mingw64\bin;%PATH%"
@@ -117,8 +111,7 @@ REM The primary host orx-project org is currently down - use the
     premake4.exe gmake
     if %errorLevel% neq 0 (
         echo ERROR: premake failed to generate build files
-        pause
-        exit /b 1
+            exit /b 1
     )
 ) 
 
@@ -134,7 +127,6 @@ cd /d "%BUILD_ROOT%\norx\orx\code\build\windows\gmake"
 mingw32-make config=release64
 if %errorLevel% neq 0 (
     echo ERROR: ORX release64 build failed
-    pause
     exit /b 1
 )
 

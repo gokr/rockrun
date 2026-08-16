@@ -14,7 +14,6 @@ echo === Building Rockrun (Windows) ===
 
 if not exist "%BUILD_ROOT%\norx" (
     echo ERROR: norx not found - run makeorxwindows.sh / build-orx first
-    pause
     exit /b 1
 )
 
@@ -28,7 +27,6 @@ nimble install -d -y
 nim c -d:release --passL:"%SHARED%\build\orx\orx.dll" -o:"%SHARED%\build\rockrun.exe" src\rockrun.nim
 if %errorLevel% neq 0 (
     echo ERROR: rockrun build failed
-    pause
     exit /b 1
 )
 
