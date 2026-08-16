@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The single hero is now a `Player` record in `world.players` (physics
+  object, spawn point, input set, animation state per player) — the
+  foundation for local multiplayer; no behavior change.
+
 ## [0.3.2] - 2026-08-16
 
 HUD rendering fix, finer sand and tighter hero.

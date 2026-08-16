@@ -33,6 +33,25 @@ type
     subs*: array[16, ptr orxOBJECT]
     center*: orxVECTOR
 
+  Player* = object
+    ## One hero: physics object, spawn point and per-player state.
+    ## Single-player runs use players[0]; the multiplayer fields
+    ## (lives/score/collecting/respawn) are wired up by the game modes
+    ## in later phases.
+    obj*: ptr orxOBJECT
+    index*: int
+    inputSet*: string
+    spawnX*, spawnY*: int
+    lives*: int
+    score*: int
+    collected*: int
+    needed*: int
+    deathReason*: string
+    respawnTimer*: float32
+    invulnTimer*: float32
+    currentAnim*: string
+    digAnimTimer*: float32
+
 const
   ## Sub-grid size per cell (4x4) and block size in pixels.
   SubGrid* = 4
@@ -59,18 +78,33 @@ var
   walls*: seq[bool]
   wallObjects: seq[ptr orxOBJECT]
   pendingCreatures*: seq[tuple[config: string, x, y: int]]
-  player*: ptr orxOBJECT
+  players*: seq[Player]
   exitObject*: ptr orxOBJECT
   boulders*: seq[ptr orxOBJECT]
   gems*: seq[ptr orxOBJECT]
   dirts*: seq[ptr orxOBJECT]
-  playerSpawnX*, playerSpawnY*: int
+  playerSpawns*: seq[tuple[x, y: int]]
 
 var
   destroyedObjects: HashSet[pointer]
   dugThisFrame*: int
   ## Number of fine sand blocks actually dug out during the current frame
   ## (reset by the caller; used to trigger the dig animation).
+
+proc playerObj*(): ptr orxOBJECT =
+  ## The first hero's physics object (single-player semantics), nil when
+  ## no hero exists.
+  if players.len > 0:
+    players[0].obj
+  else:
+    nil
+
+proc playerOf*(gameObject: ptr orxOBJECT): int =
+  ## Index of the player owning `gameObject`, -1 when it is no hero.
+  result = -1
+  for index, hero in players:
+    if hero.obj == gameObject:
+      return index
 
 proc levelSection(index: int): string = "Level" & $(index + 1)
 
@@ -162,10 +196,15 @@ proc spawnBurst*(configName: string; position: orxVECTOR; count = 3) =
     if puff != nil:
       discard puff.setPosition(position)
 
-proc destroySmallSand*(gameObject: ptr orxOBJECT) =
-  ## Digs out a fine sand block: dust, sound and score.
+proc destroySmallSand*(gameObject: ptr orxOBJECT;
+                       digger: ptr orxOBJECT = nil) =
+  ## Digs out a fine sand block: dust, sound and score. The dig sound is
+  ## attributed to the digging hero.
   if gameObject == nil:
     return
+  var digger = digger
+  if digger == nil:
+    digger = playerObj()
   let position = gameObject.getWorldPosition()
   spawnBurst("DustPuff", position, 2)
   # Unlink from the owning cell so later passes never see a stale pointer.
@@ -175,9 +214,9 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT) =
     for i in 0 ..< cell.subs.len:
       if cell.subs[i] == gameObject:
         cell.subs[i] = nil
-  if player != nil and gs.worldClockTime - gs.lastDig >= 0.11'f32:
+  if digger != nil and gs.worldClockTime - gs.lastDig >= 0.11'f32:
     gs.lastDig = gs.worldClockTime
-    discard player.addSound("DigSound")
+    discard digger.addSound("DigSound")
   destroyObject(gameObject)
   gs.dirtDug += 1
   dugThisFrame += 1
@@ -206,14 +245,15 @@ proc refineSand*(gameObject: ptr orxOBJECT) =
       cell.subs[i] = sub
   cell.refined = true
 
-proc digSand*(gameObject: ptr orxOBJECT) =
+proc digSand*(gameObject: ptr orxOBJECT; digger: ptr orxOBJECT = nil) =
   ## Contact-triggered digging: refine big blocks, destroy fine ones.
   case objectKind(gameObject)
   of "Sand32": refineSand(gameObject)
-  of "SandFine": destroySmallSand(gameObject)
+  of "SandFine": destroySmallSand(gameObject, digger)
   else: discard
 
-proc digAround*(origin: orxVECTOR; dirX, dirY: float32) =
+proc digAround*(origin: orxVECTOR; dirX, dirY: float32;
+                digger: ptr orxOBJECT = nil) =
   ## Digs/refines sand immediately ahead of the player's movement.
   ## Fine 10.67px blocks in the dig path are removed; 32px blocks swapped.
   ## Only the cells near the player are considered (windowed for speed);
@@ -234,7 +274,7 @@ proc digAround*(origin: orxVECTOR; dirX, dirY: float32) =
           let vertical = dirY != 0.0 and dy * dirY > 0.0 and
                          abs(dx) < 17.0 and abs(dy) < 30.0
           if horizontal or vertical:
-            destroySmallSand(sub)
+            destroySmallSand(sub, digger)
       elif cell.big != nil:
         let dx = cell.center.fX - origin.fX
         let dy = cell.center.fY - origin.fY
@@ -243,8 +283,9 @@ proc digAround*(origin: orxVECTOR; dirX, dirY: float32) =
         if near:
           refineSand(cell.big)
 
-proc collectGem*(gem: ptr orxOBJECT) =
-  ## Picks up a diamond: score, sparkle, and exit bookkeeping.
+proc collectGem*(gem: ptr orxOBJECT; collector: ptr orxOBJECT = nil) =
+  ## Picks up a diamond: score, sparkle, and exit bookkeeping. The
+  ## collect sound/flash are attributed to the touching hero.
   if world.gems.find(gem) < 0:
     when defined(debugContacts):
       echo "COLLECT skip: gem not tracked"
@@ -254,9 +295,12 @@ proc collectGem*(gem: ptr orxOBJECT) =
          gem.getWorldPosition().fY
   let position = gem.getWorldPosition()
   spawnBurst("GemSparkle", position, 3)
-  if player != nil:
-    discard player.addSound("CollectSound")
-    discard player.addFX("CollectFlash")
+  var collector = collector
+  if collector == nil:
+    collector = playerObj()
+  if collector != nil:
+    discard collector.addSound("CollectSound")
+    discard collector.addFX("CollectFlash")
   destroyObject(gem)
   gs.collected += 1
   addScore(gs.diamondScore)
@@ -267,8 +311,9 @@ proc openExit*() =
     return
   gs.exitOpen = true
   discard exitObject.addFX("ExitOpenFX")
-  if player != nil:
-    discard player.addSound("ExitOpenSound")
+  let hero = playerObj()
+  if hero != nil:
+    discard hero.addSound("ExitOpenSound")
 
 proc spawnBoulderAt*(cx, cy: int): ptr orxOBJECT =
   ## Spawns an extra boulder (also used by the startup test).
@@ -297,8 +342,29 @@ proc clearWorld*() =
   pendingCreatures.setLen(0)
   destroyObject(exitObject)
   exitObject = nil
-  destroyObject(player)
-  player = nil
+  for hero in players:
+    destroyObject(hero.obj)
+  players.setLen(0)
+  playerSpawns.setLen(0)
+
+proc spawnPlayers*(): bool =
+  ## Instantiates one hero object per spawn point in `playerSpawns`.
+  for index, spawnPoint in playerSpawns:
+    let hero = objectCreateFromConfig("Player")
+    if hero == nil:
+      echo "Could not create the player"
+      return false
+    let position = cellWorld(spawnPoint.x, spawnPoint.y)
+    if hero.setPosition(
+        newVector(position.fX, position.fY, PlayerZ)).isFailure:
+      return false
+    players.add(Player(
+      obj: hero,
+      index: index,
+      inputSet: (if index == 0: "P1" else: "P" & $(index + 1)),
+      spawnX: spawnPoint.x,
+      spawnY: spawnPoint.y))
+  result = true
 
 proc buildWorld(level: LevelDef): bool =
   ## Instantiates all level objects from a parsed definition.
@@ -365,8 +431,7 @@ proc buildWorld(level: LevelDef): bool =
         pendingCreatures.add((config: (if symbol == 'f': "Firefly"
                                        else: "Butterfly"), x: x, y: y))
       of '@':
-        playerSpawnX = x
-        playerSpawnY = y
+        playerSpawns.add((x: x, y: y))
         inc playerCount
       of ' ':
         discard
@@ -382,13 +447,7 @@ proc buildWorld(level: LevelDef): bool =
     echo "Level has not enough diamonds"
     return false
 
-  player = objectCreateFromConfig("Player")
-  if player == nil:
-    echo "Could not create the player"
-    return false
-  let spawn = cellWorld(playerSpawnX, playerSpawnY)
-  result = player.setPosition(
-    newVector(spawn.fX, spawn.fY, PlayerZ)).isSuccess
+  result = spawnPlayers()
 
 proc loadWorld*(index: int): bool =
   ## Parses and instantiates a level, replacing the current world.

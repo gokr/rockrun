@@ -13,14 +13,15 @@ music, SFX, particle/FX juice, a scroll-following camera and three caves.
   camera, pause, startup test script. Everything wires through here.
 - `src/game.nim` — run state singleton `gs` (score/lives/quota/timers/
   phases). No ORX object knowledge; freely importable.
-- `src/world.nim` — owns ORX objects: level parsing, spawning/teardown,
-  digging, collecting, tombstone set for same-frame deletions.
+- `src/world.nim` — owns ORX objects: level parsing, spawning/teardown
+  (heroes as per-player `Player` records), digging, collecting, tombstone
+  set for same-frame deletions.
 - `src/contacts.nim` — PHYSICS contact event queue and rules. ORX events
   arrive during Box2D steps, so bodies are never mutated there; contacts are
   drained once per frame afterwards.
-- `src/movement.nim` — player input (keyboard + d-pad + analog axes),
-  velocity control and the idle/run/dig animation state machine; calls
-  `world.digAround`.
+- `src/movement.nim` — per-player input (keyboard + d-pad + analog axes),
+  velocity control and the idle/run/dig animation state machine living on
+  each `Player` record; calls `world.digAround`.
 - `src/creatures.nim` — fireflies/butterflies: wall-hugging steering
   decisions at cell centers against a static occupancy map (walls + live
   sand), explosion into diamonds when crushed.

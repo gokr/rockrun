@@ -148,8 +148,10 @@ proc startDying() =
   dyingHandled = true
   dec gs.lives
   gs.shake = 9.0
-  discard player.addSound("LoseSound")
-  discard player.addFX("HitFlash")
+  let hero = world.playerObj()
+  if hero != nil:
+    discard hero.addSound("LoseSound")
+    discard hero.addFX("HitFlash")
   ui.showMessage(gs.deathReason.toUpperAscii(), 1.4)
   ui.showSubMessage(&"LIVES {gs.lives}", 1.4)
   gs.hudDirty = true
@@ -175,15 +177,18 @@ proc restartRun() =
 proc completeLevel() =
   let bonus = int(gs.timeLeft) * gs.timeBonusPerSecond
   addScore(bonus)
-  discard player.addSound("WinSound")
+  let hero = world.playerObj()
+  if hero != nil:
+    discard hero.addSound("WinSound")
   ui.showMessage("CAVE CLEARED!", CompleteTime)
   ui.showSubMessage(&"TIME BONUS +{bonus}", CompleteTime)
   enterPhase(phComplete)
 
 proc updateCamera(deltaTime: float32) =
-  if player == nil or mainCamera == nil:
+  let hero = world.playerObj()
+  if hero == nil or mainCamera == nil:
     return
-  let target = player.getWorldPosition()
+  let target = hero.getWorldPosition()
   var cameraPosition: orxVECTOR
   discard getPosition(mainCamera, addr cameraPosition)
 
@@ -219,10 +224,11 @@ proc runTestScript(deltaTime: float32) =
     let previousSecond = int(test.time)
     test.time += deltaTime
     if int(test.time) > previousSecond and test.time < 12.0 and
-        world.player != nil:
-      let playerPosition = world.player.getWorldPosition()
-      let playerSpeed = world.player.getSpeed()
-      let (inputX, inputY) = movement.inputDirection()
+        world.playerObj() != nil:
+      let hero = world.playerObj()
+      let playerPosition = hero.getWorldPosition()
+      let playerSpeed = hero.getSpeed()
+      let (inputX, inputY) = movement.inputDirection(world.players[0])
       echo "TEST t=", test.time.int, " phase=", gs.phase,
            " pos=(", playerPosition.fX, ",", playerPosition.fY, ") v=(",
            playerSpeed.fX, ",", playerSpeed.fY, ") in=(",
@@ -258,7 +264,7 @@ proc runTestScript(deltaTime: float32) =
       ## the gem violently).
       let gem = objectCreateFromConfig("Diamond")
       if gem != nil:
-        let playerPosition = world.player.getWorldPosition()
+        let playerPosition = world.playerObj().getWorldPosition()
         let (px, py) = world.cellOf(playerPosition)
         let position = world.cellWorld(px + 1, py)
         discard gem.setPosition(
@@ -287,7 +293,7 @@ proc runTestScript(deltaTime: float32) =
       gs.collected = gs.needed
     of taTeleport:
       test.exitTeleported = true
-      discard world.player.setWorldPosition(
+      discard world.playerObj().setWorldPosition(
         world.cellWorld(action.cx, action.cy))
     of taScreenshot:
       discard screenshots.takeScreenshot()
@@ -351,7 +357,8 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
     if gs.timeLeft <= 0.0:
       gs.deathReason = "Out of time"
       enterPhase(phDying)
-    movement.updatePlayer(deltaTime)
+    for hero in world.players.mitems:
+      movement.updatePlayer(hero, deltaTime)
     creatures.updateCreatures(deltaTime)
     if not gs.exitOpen and gs.collected >= gs.needed:
       world.openExit()

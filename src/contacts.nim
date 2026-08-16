@@ -86,7 +86,10 @@ proc processContact(contact: Contact) =
     pair = {firstKind, secondKind}
 
   if pair == {kPlayer, kDirt}:
-    digSand(if firstKind == kDirt: contact.first else: contact.second)
+    let
+      dirt = if firstKind == kDirt: contact.first else: contact.second
+      digger = if firstKind == kPlayer: contact.first else: contact.second
+    digSand(dirt, digger)
 
   elif pair == {kPlayer, kDiamond}:
     when defined(debugContacts):
@@ -95,7 +98,10 @@ proc processContact(contact: Contact) =
          else: contact.second.getWorldPosition().fX), ", ",
         (if firstKind == kDiamond: contact.first.getWorldPosition().fY
          else: contact.second.getWorldPosition().fY)
-    collectGem(if firstKind == kDiamond: contact.first else: contact.second)
+    let
+      gem = if firstKind == kDiamond: contact.first else: contact.second
+      collector = if firstKind == kPlayer: contact.first else: contact.second
+    collectGem(gem, collector)
 
   elif pair == {kPlayer, kExit}:
     if gs.exitOpen:
