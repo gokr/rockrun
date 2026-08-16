@@ -87,7 +87,7 @@ var
   scenarioIndex = 0
 
 var
-  mainViewport: ptr orxVIEWPORT
+  mainViewport, hudViewport: ptr orxVIEWPORT
   mainCamera: ptr orxCAMERA
   cameraHalfW, cameraHalfH: float32
   coreClock: ptr orxCLOCK
@@ -222,7 +222,6 @@ proc updateCamera(deltaTime: float32) =
     cameraPosition.fY += shakeY
 
   discard setPosition(mainCamera, addr cameraPosition)
-  ui.positionHud(cameraPosition.fX, cameraPosition.fY)
 
 const
   ## dt multiplier used only for the scripted test, to compensate for the
@@ -501,7 +500,13 @@ proc init(): orxSTATUS {.cdecl.} =
 
   mainViewport = viewportCreateFromConfig("MainViewport")
   if mainViewport == nil:
-    echo "Could not create the viewports"
+    echo "Could not create the main viewport"
+    return STATUS_FAILURE
+  # Second viewport for the HUD: its camera never sees the world (z range),
+  # so it only ever renders the HUD text on top of the game view.
+  hudViewport = viewportCreateFromConfig("HudViewport")
+  if hudViewport == nil:
+    echo "Could not create the HUD viewport"
     return STATUS_FAILURE
   mainCamera = getCamera(mainViewport)
   if mainCamera == nil:
