@@ -11,7 +11,7 @@ if %errorLevel% neq 0 (
     exit /b 1
 )
 
-set "NIM_VERSION=2.2.6"
+set "NIM_VERSION=2.2.10"
 set "TEMP_DIR=%TEMP%\rockrun-setup"
 
 :: Install Chocolatey if not present
