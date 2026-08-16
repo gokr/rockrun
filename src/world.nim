@@ -36,6 +36,8 @@ const
   ## Sub-grid size per cell (4x4) and block size in pixels.
   SubGrid* = 4
   SubBlock* = CellSize / SubGrid.float32
+  ## Maximum grains that may become loose simultaneously (--sand option).
+  MaxLooseGrains = 300
 
 proc computeSubOffsets(): array[SubGrid * SubGrid, tuple[x, y: float32]]
     {.compileTime.} =
@@ -78,6 +80,10 @@ var
   ## (reset by the caller; used to trigger the dig animation).
   digDustFlip = false
   ## Alternates so dust bursts appear on ~50% of dug blocks.
+  looseSandEnabled* = false
+  ## Opt-in experimental loose sand (--sand): boulders turn pressed sand
+  ## grains dynamic so they give way.
+  looseGrainCount = 0
 
 proc levelSection(index: int): string = "Level" & $(index + 1)
 
@@ -223,8 +229,14 @@ proc refineSand*(gameObject: ptr orxOBJECT) =
 
 proc activateGrainColumn*(grain: ptr orxOBJECT) =
   ## A boulder presses on this fine grain: make it and the grains directly
-  ## below (same column, up to 3 cells) dynamic so they can give way. All
-  ## other grains stay static - no self-collapse.
+  ## below (same column, up to 3 cells) dynamic so they can give way.
+  ## Only active with --sand; otherwise grains stay static. The number of
+  ## loose grains is capped so collapses can't cascade into a physics
+  ## meltdown.
+  if not looseSandEnabled:
+    return
+  if looseGrainCount >= MaxLooseGrains:
+    return
   if grain == nil or isDestroyed(grain):
     return
   let (cx, cy) = cellOf(grain.getWorldPosition())
@@ -245,6 +257,9 @@ proc activateGrainColumn*(grain: ptr orxOBJECT) =
         if body != nil and isDynamic(body) == orxFALSE:
           discard setDynamic(body, orxTRUE)
           discard candidate.setSpeed(newVector(0.0, 2.0, 0.0))
+          inc looseGrainCount
+          if looseGrainCount >= MaxLooseGrains:
+            return
 
 proc digSand*(gameObject: ptr orxOBJECT) =
   ## Contact-triggered digging: refine big blocks, destroy fine ones.

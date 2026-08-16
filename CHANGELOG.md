@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Loose sand is now opt-in via `--sand` (boulder-pressed grains give
+  way); off by default since collapses could slow the big caves. A cap
+  of 300 simultaneously loose grains keeps it bounded.
 - Five caves now (First Descent stays a simple tutorial, Rolling Fields
   and Deep Vault got much denser boulder fields, plus two new caves:
   Rumbling Depths and The Final Chamber).

@@ -153,6 +153,7 @@ proc runFinalChecks() =
     echo "Rockrun completion checks passed"
 
 let startupTest = "--startup-test" in commandLineParams()
+let looseSand = "--sand" in commandLineParams()
 
 proc setEnginePaused(paused: bool) =
   ## Zeroes dt for the whole core clock: physics and logic freeze while
@@ -193,6 +194,7 @@ proc reloadLevel() =
 proc restartRun() =
   resetRun()
   gs.lives = gs.livesStart
+  world.looseSandEnabled = looseSand
   reloadLevel()
 
 proc completeLevel() =
@@ -574,6 +576,7 @@ proc init(): orxSTATUS {.cdecl.} =
 
   resetRun()
   gs.lives = gs.livesStart
+  world.looseSandEnabled = looseSand
   if not world.loadWorld(0):
     echo "Could not load the first level"
     return STATUS_FAILURE

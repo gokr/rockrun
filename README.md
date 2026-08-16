@@ -97,6 +97,12 @@ the working directory, or the source tree, so you can run it from anywhere.
 ./rockrun
 ```
 
+Optional experimental flags:
+
+- `--sand` — enable loose sand: boulders press refined sand grains
+  dynamic so thin dirt can collapse under their weight. Off by default
+  because the collapse cascades can get heavy on larger caves.
+
 ## Testing
 
 Rockrun ships an in-engine, scripted startup test that actually plays the
