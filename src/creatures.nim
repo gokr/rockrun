@@ -24,6 +24,8 @@ type
     dirX*, dirY*: int
     targetX*, targetY*: int
     speed*: float32
+    lastDist*: float32
+    stuckTime*: float32
 
 var
   creatures*: seq[Creature]
@@ -136,7 +138,22 @@ proc updateCreatures*(deltaTime: float32) =
     let target = world.cellWorld(creature.targetX, creature.targetY)
     let dx = target.fX - position.fX
     let dy = target.fY - position.fY
-    if abs(dx) + abs(dy) <= ArrivalDistance:
+    let dist = abs(dx) + abs(dy)
+
+    # Stuck detection: if we are not arriving and made no progress
+    # towards the target for a while, the body is probably wedged or
+    # sliding along a wall - pick a new direction.
+    if dist > ArrivalDistance:
+      if dist >= creature.lastDist - 1.0'f32:
+        creature.stuckTime += deltaTime
+      else:
+        creature.stuckTime = 0.0
+      if creature.stuckTime > 0.5:
+        creature.stuckTime = 0.0
+        chooseDirection(creature)
+    creature.lastDist = dist
+
+    if dist <= ArrivalDistance:
       creature.cellX = creature.targetX
       creature.cellY = creature.targetY
       chooseDirection(creature)

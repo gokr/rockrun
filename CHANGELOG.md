@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   object, spawn point, input set, animation state per player).
 - Object destruction is deferred to end of frame (`flushDestroyed`) so
   newly created objects can never alias same-frame destroyed addresses.
+- More boulders in all three caves (24/38/47) with extra placement bands;
+  cave 1 keeps its startup-test corridor clear of falling rocks.
+- HUD renders through a dedicated camera-space viewport (HudViewport) so
+  text always draws on top; per-player lives lines replace the single
+  LIVES counter.
+- Creatures re-steer when wedged (stuck detection).
 
 ## [0.3.2] - 2026-08-16
 

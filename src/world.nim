@@ -93,6 +93,8 @@ var
   dugThisFrame*: int
   ## Number of fine sand blocks actually dug out during the current frame
   ## (reset by the caller; used to trigger the dig animation).
+  digDustFlip = false
+  ## Alternates so dust bursts appear on ~50% of dug blocks.
 
 proc playerObj*(): ptr orxOBJECT =
   ## The first hero's physics object (single-player semantics), nil when
@@ -261,7 +263,10 @@ proc destroySmallSand*(gameObject: ptr orxOBJECT;
   if digger == nil:
     digger = playerObj()
   let position = gameObject.getWorldPosition()
-  spawnBurst("DustPuff", position, 2)
+  # Every other dug block kicks up dust, so digging isn't a dust storm.
+  digDustFlip = not digDustFlip
+  if digDustFlip:
+    spawnBurst("DustPuff", position, 1)
   # Unlink from the owning cell so later passes never see a stale pointer.
   let (cx, cy) = cellOf(position)
   if cx >= 0 and cx < worldW and cy >= 0 and cy < worldH:
