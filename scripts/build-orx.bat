@@ -44,7 +44,9 @@ cd /d "%BUILD_ROOT%\norx\orx"
 if not exist "code\build\windows\gmake\Makefile" (
     if exist "setup.bat" (
         echo Running ORX setup...
-        call setup.bat
+        :: setup.bat ends with a pause when run through cmd /c (which is
+        :: how Vagrant invokes it) - pipe a newline to satisfy it.
+        echo. | call setup.bat
     ) else (
         echo ERROR: setup.bat not found
         pause
