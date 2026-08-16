@@ -60,6 +60,7 @@ type
     lastClink*: float32
     lastPush*: float32
     lastDig*: float32
+    lastSink*: float32
     worldClockTime*: float32
     shake*: float32
     hudDirty*: bool

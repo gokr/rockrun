@@ -7,17 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Loose sand is now opt-in via `--sand` (boulder-pressed grains give
-  way); off by default since collapses could slow the big caves. A cap
-  of 300 simultaneously loose grains keeps it bounded.
-- Five caves now (First Descent stays a simple tutorial, Rolling Fields
-  and Deep Vault got much denser boulder fields, plus two new caves:
-  Rumbling Depths and The Final Chamber).
-- New huge boulder size ('R') that crushes harder and jams tunnels.
-- Loose sand: refined 8px grains stay static until a boulder presses on
-  them, then the touched grain column turns dynamic and gives way - dig
-  too close under a boulder and the thin dirt collapses.
+## [1.0.0] - 2026-08-16
+
+First stable release.
+
+### Added
+
+- Two new caves (Rumbling Depths 56x30, The Final Chamber 56x30) plus
+  densified boulder fields in Rolling Fields and Deep Vault; First
+  Descent stays a simple tutorial. Five caves in total.
+- New huge boulder size ('R', ~54px) that crushes harder and can jam
+  tunnels; generator and parser support it.
+- Loose sand: refined 8px grains are static by default, and a resting
+  boulder now slowly beds into loose sand, eating the grain it rests on
+  (dust + creak) - simulated, always on.
+- `--sand` opt-in: boulder-pressed grains turn dynamic and give way in a
+  wedge below plus the column above the contact, capped at 300 loose
+  grains so collapse cascades stay bounded.
 - Fullscreen toggle (F key).
+
+### Changed
+
+- Creature steering hardened: smaller physics body (11px), blocked-target
+  re-steering and a stuck timer; the startup test asserts cave-2
+  creatures travel >200px so steering stalls fail CI.
+- Fine-sand bookkeeping reworked into a flat grain list with per-cell
+  counts (no stale pointers); destruction guards against same-frame
+  double frees.
+- Press Start 2P font replaced with Bungee (SIL OFL), rasterized at 64px
+  for thick strokes; HUD renders through its own viewport so text always
+  sits on top of the world.
+- HUD text scales, positions and colors tuned for readability.
+
+### Fixed
+
+- Wall objects leaked across level reloads (the "second brick rectangle"
+  in cave 2, which also physically blocked the hall).
+- Boulders scale jitter removed so adjacent rocks touch.
+- Typefaces load through the Font resource group - the custom font had
+  never actually loaded before.
+- Dig dust bursts halved and the dig swing animation plays every other
+  dig with a visible pickaxe.
+- Creature explosion no longer leaves dangling tracking records.
 
 ## [0.3.2] - 2026-08-16
 
@@ -160,5 +191,5 @@ First working release.
   capture for visual review.
 - Debug build linked against liborxd, release task linked against liborx.
 
-[Unreleased]: https://github.com/gokr/rockrun/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/gokr/rockrun/releases/tag/v0.1.0
+[Unreleased]: https://github.com/gokr/rockrun/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/gokr/rockrun/releases/tag/v1.0.0

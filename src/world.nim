@@ -228,11 +228,12 @@ proc refineSand*(gameObject: ptr orxOBJECT) =
   cell.refined = true
 
 proc activateGrainColumn*(grain: ptr orxOBJECT) =
-  ## A boulder presses on this fine grain: make it and the grains directly
-  ## below (same column, up to 3 cells) dynamic so they can give way.
-  ## Only active with --sand; otherwise grains stay static. The number of
-  ## loose grains is capped so collapses can't cascade into a physics
-  ## meltdown.
+  ## A boulder presses on this fine grain: the grains around the contact
+  ## turn dynamic so they can give way - the column above the contact
+  ## (the pile wedged by the boulder) plus a cone below (repose-angle
+  ## failure). Only active with --sand; otherwise grains stay static.
+  ## The number of loose grains is capped so collapses can't cascade into
+  ## a physics meltdown.
   if not looseSandEnabled:
     return
   if looseGrainCount >= MaxLooseGrains:
@@ -242,24 +243,25 @@ proc activateGrainColumn*(grain: ptr orxOBJECT) =
   let (cx, cy) = cellOf(grain.getWorldPosition())
   if cx < 0 or cx >= worldW or cy < 0 or cy >= worldH:
     return
-  for depth in 0 ..< 4:
-    let targetY = cy + depth
-    if targetY >= worldH:
-      break
-    for candidate in fineGrains:
-      if isDestroyed(candidate):
-        continue
-      let position = candidate.getWorldPosition()
-      if abs(position.fX - (worldMinX + (cx.float32 + 0.5) * CellSize)) < 6.0 and
-          abs(position.fY - (worldMinY + (targetY.float32 + 0.5) * CellSize)) < 6.0:
-        let body = cast[ptr orxBODY](
-          internal_orxObject_GetStructure(candidate, STRUCTURE_ID_BODY))
-        if body != nil and isDynamic(body) == orxFALSE:
-          discard setDynamic(body, orxTRUE)
-          discard candidate.setSpeed(newVector(0.0, 2.0, 0.0))
-          inc looseGrainCount
-          if looseGrainCount >= MaxLooseGrains:
-            return
+  for candidate in fineGrains:
+    if isDestroyed(candidate):
+      continue
+    let (gx, gy) = cellOf(candidate.getWorldPosition())
+    let below = gy - cy
+    if below < -3 or below > 3:
+      continue
+    # Widening cone below the contact, pure column above it.
+    let maxSpread = (if below > 0: min(below, 2) else: 0)
+    if abs(gx - cx) > maxSpread:
+      continue
+    let body = cast[ptr orxBODY](
+      internal_orxObject_GetStructure(candidate, STRUCTURE_ID_BODY))
+    if body != nil and isDynamic(body) == orxFALSE:
+      discard setDynamic(body, orxTRUE)
+      discard candidate.setSpeed(newVector(0.0, 2.0, 0.0))
+      inc looseGrainCount
+      if looseGrainCount >= MaxLooseGrains:
+        return
 
 proc digSand*(gameObject: ptr orxOBJECT) =
   ## Contact-triggered digging: refine big blocks, destroy fine ones.
