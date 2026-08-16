@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- More boulders in all three caves (24/38/47) with extra placement bands;
+  cave 1 keeps its startup-test corridor clear of falling rocks.
+
 ## [0.3.2] - 2026-08-16
 
 HUD rendering fix, finer sand and tighter hero.

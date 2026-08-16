@@ -66,7 +66,7 @@ def emit(name, section, g, needed, time_limit):
         for x in range(w):
             if g[y][x] in BOULDER_ANY or g[y][x] == GEM:
                 assert supported(g, x, y), (name, x, y, g[y][x])
-    print(f"-- {name}: {w}x{h}, {len([r for r in rows for c in r if c == BOULDER])} boulders, {gems} diamonds (need {needed})\n"
+    print(f"-- {name}: {w}x{h}, {sum(r.count(b) for r in rows for b in 'oOQ')} boulders, {gems} diamonds (need {needed})\n"
           + "\n".join(rows) + "\n")
     lines = [f"[{section}]", f"Name           = \"{name}\"",
              f"NeededDiamonds = {needed}", f"TimeLimit      = {time_limit}",
@@ -101,8 +101,14 @@ def level1():
     carve(g, 35, 19, 37, 19)
     g[ey][ex] = EXIT
     # boulders on dirt shelves: mostly normal, some small, few big
-    bands = [(2, 3, 27, 6), (5, 14, 19, 15), (23, 11, 28, 11), (13, 18, 20, 18), (32, 4, 37, 6)]
-    placed = scatter(g, rng, w, h, BOULDER, 14, reserved, bands)
+    bands = [(2, 3, 27, 6), (5, 14, 19, 15), (23, 11, 28, 11), (13, 18, 20, 18),
+             (32, 4, 37, 6), (3, 8, 27, 10), (28, 11, 37, 13), (24, 17, 37, 18)]
+    # keep the startup-test dig path clear of falling rocks: no boulders
+    # directly above the corridor the test digs (cols 2-12, rows 3-4)
+    for x in range(2, 13):
+        for y in range(3, 5):
+            reserved.add((x, y))
+    placed = scatter(g, rng, w, h, BOULDER, 24, reserved, bands)
     for i, (bx, by) in enumerate(placed):
         if i % 5 == 3:
             g[by][bx] = 'o'
@@ -148,8 +154,9 @@ def level2():
     g[12][9] = 'f'
     g[16][39] = 'b'
     bands = [(17, 9, 31, 9), (11, 4, 15, 8), (33, 4, 37, 8), (40, 6, 45, 12),
-             (18, 17, 30, 17), (12, 18, 24, 18), (29, 20, 43, 20), (2, 6, 8, 12)]
-    placed = scatter(g, rng, w, h, BOULDER, 24, reserved, bands)
+             (18, 17, 30, 17), (12, 18, 24, 18), (29, 20, 43, 20), (2, 6, 8, 12),
+             (2, 13, 8, 19), (41, 13, 45, 19), (12, 5, 15, 7), (18, 11, 30, 12)]
+    placed = scatter(g, rng, w, h, BOULDER, 38, reserved, bands)
     for i, (bx, by) in enumerate(placed):
         if i % 4 == 2:
             g[by][bx] = 'o'
@@ -187,8 +194,9 @@ def level3():
     g[14][33] = 'f'
     g[21][24] = 'b'
     bands = [(3, 4, 19, 10), (28, 6, 44, 7), (7, 13, 19, 13), (28, 13, 41, 13),
-             (9, 20, 39, 20), (21, 14, 26, 14), (2, 16, 17, 19)]
-    placed = scatter(g, rng, w, h, BOULDER, 30, reserved, bands)
+             (9, 20, 39, 20), (21, 14, 26, 14), (2, 16, 17, 19),
+             (2, 10, 20, 12), (24, 17, 45, 18), (28, 4, 45, 5)]
+    placed = scatter(g, rng, w, h, BOULDER, 45, reserved, bands)
     for i, (bx, by) in enumerate(placed):
         if i % 4 == 1:
             g[by][bx] = 'o'

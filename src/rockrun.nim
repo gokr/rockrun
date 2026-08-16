@@ -59,6 +59,8 @@ type
     explodedGemCount: int
     collectedBeforeExit: int
     creatureSpawns: seq[orxVECTOR]
+    creaturePath: seq[float32]
+    creatureLastPos: seq[orxVECTOR]
     moveUntil: float32
     exitTeleported: bool
     completed: bool
@@ -130,6 +132,11 @@ proc runFinalChecks() =
         creaturesMoved = true
   testCheck(creaturesMoved,
     "cave-2 creatures did not move (wall-hugging steering stuck?)")
+  var creatureTravel = 0.0
+  for length in test.creaturePath:
+    creatureTravel += length
+  testCheck(creatureTravel > 200.0,
+    fmt"cave-2 creatures barely moved ({creatureTravel:.0f}px total)")
   testCheck(gs.levelIndex == 1,
     fmt"the second cave did not load (levelIndex={gs.levelIndex})")
   testCheck(gs.phase in {phIntro, phPlaying},
@@ -323,6 +330,26 @@ proc runTestScript(deltaTime: float32) =
       (gs.levelCompleted or gs.phase == phComplete):
     test.completed = true
     movement.movementOverride = options.none(tuple[x, y: float32])
+
+  ## Track cave-2 creature travel so the test can assert they keep moving
+  ## (wall-hugging steering must never stall them).
+  if test.creatureSpawns.len > 0:
+    if test.creaturePath.len != creatures.creatures.len:
+      test.creaturePath.setLen(creatures.creatures.len)
+      test.creatureLastPos.setLen(creatures.creatures.len)
+    for i, creature in creatures.creatures:
+      if creature.obj == nil:
+        continue
+      let position = creature.obj.getWorldPosition()
+      if test.creaturePath[i] == 0.0 and
+          test.creatureLastPos[i].fX == 0.0 and
+          test.creatureLastPos[i].fY == 0.0:
+        discard
+      else:
+        test.creaturePath[i] += hypot(
+          position.fX - test.creatureLastPos[i].fX,
+          position.fY - test.creatureLastPos[i].fY)
+      test.creatureLastPos[i] = position
 
 proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
   if isActive("Quit"):
