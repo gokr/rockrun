@@ -80,17 +80,17 @@ heroes. Repos: `~/git/rockrun` (main) and `~/git/rockrun-mp`
   seconds. The startup-test scenario is a declarative `TestAction`
   table in rockrun.nim.
 
-## Multiplayer worktree (branch `multiplayer`)
+## Multiplayer (merged into main as of 1.1.0)
 
-- Work happens in `~/git/rockrun-mp` on branch `multiplayer`;
-  `~/git/rockrun` stays on `main`.
-- Plan: `docs/MULTIPLAYER.md` (local 1–4 players; coop + race modes).
+- Local coop (1–4 players, lobby join, per-player lives/respawn, shared
+  quota, group camera) lives on `main`; plan and background in
+  `docs/MULTIPLAYER.md` (race mode is future work).
 - Architecture: heroes are `Player` records in `world.players`
   (world.nim); movement/contacts attribute dig/collect/death to the
   touching hero via `playerObj()`/`playerOf()`.
 - Rule: the single-player startup test must stay green after every
-  phase; a second scripted scenario (`--startup-test-mp`) covers
-  multiplayer behavior.
+  change; a second scripted scenario (`--startup-test-mp`, `nimble
+  test-mp`) covers multiplayer behavior.
 
 ## Conventions
 

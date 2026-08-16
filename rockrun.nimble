@@ -1,6 +1,6 @@
 # Package
 
-version       = "1.0.0"
+version       = "1.1.0"
 author        = "Göran Krampe"
 description   = "Rockrun - a physics-based Boulder Dash successor built with the Norx wrapper for the ORX game engine"
 license       = "MIT"
