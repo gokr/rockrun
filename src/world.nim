@@ -182,6 +182,17 @@ proc objectKind*(gameObject: ptr orxOBJECT): string =
     return ""
   $getName(gameObject)
 
+proc structureValid(gameObject: ptr orxOBJECT): bool =
+  ## Cheap validity check on an ORX object pointer: its structure GUID
+  ## must still identify a live structure (freed memory gets reused with
+  ## the deleted magic tag or another structure id).
+  if gameObject == nil:
+    return false
+  let guid = cast[ptr orxSTRUCTURE](gameObject).u64GUID
+  result = (guid and STRUCTURE_GUID_MASK_STRUCTURE_ID) <
+      STRUCTURE_ID_NUMBER.uint64 and
+      guid != STRUCTURE_GUID_MAGIC_TAG_DELETED
+
 proc removeTracked(gameObject: ptr orxOBJECT) =
   for tracking in [addr world.boulders, addr world.gems, addr world.dirts]:
     let index = tracking[].find(gameObject)
@@ -195,6 +206,9 @@ proc destroyObject*(gameObject: ptr orxOBJECT) =
   ## destroyed earlier in the same frame (pointer-reuse false positives
   ## on the tombstone set).
   if gameObject == nil:
+    return
+  if not structureValid(gameObject):
+    echo "Rockrun: destroyObject on invalid object pointer (skipped)"
     return
   if cast[pointer](gameObject) in destroyedObjects:
     return
@@ -213,8 +227,10 @@ proc flushDestroyed*() =
 
 proc isDestroyed*(gameObject: ptr orxOBJECT): bool =
   ## Has this object been destroyed during the current frame? Protects
-  ## contact handling from dereferencing freed ORX objects.
-  result = gameObject == nil or cast[pointer](gameObject) in destroyedObjects
+  ## contact handling from dereferencing freed ORX objects. Also returns
+  ## true for structurally invalid pointers (freed or reused memory).
+  result = gameObject == nil or cast[pointer](gameObject) in destroyedObjects or
+           not structureValid(gameObject)
 
 proc spawnBurst*(configName: string; position: orxVECTOR; count = 3) =
   ## Spawns a few short-lived particles.

@@ -62,6 +62,10 @@ proc boulderAhead(player: Player; dx: float32): bool =
   ## Is there a boulder right where the player is pushing?
   let position = player.obj.getWorldPosition()
   for boulder in world.boulders:
+    if world.isDestroyed(boulder):
+      # Stale tracking entry (freed or reused object): skip, never
+      # dereference it.
+      continue
     let rockPosition = boulder.getWorldPosition()
     if abs(rockPosition.fY - position.fY) < 28.0 and
         (rockPosition.fX - position.fX) * dx > 12.0 and
