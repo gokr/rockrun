@@ -198,6 +198,9 @@ proc runFinalChecksMp() =
   testCheck(test.respawned[1], "P2 did not respawn at the spawn cell")
   testCheck(test.completed,
     "P1 could not complete the cave through the exit")
+  testCheck(cameraHalfW * 2.0 <= worldMaxX * 2.0 + 1.0 and
+            cameraHalfH * 2.0 <= worldMaxY * 2.0 + 1.0,
+    "camera zoomed past the cave bounds (void visible)")
   testCheck(gs.levelIndex == 1,
     fmt"the second cave did not load (levelIndex={gs.levelIndex})")
   if test.failures.len == 0:
@@ -290,17 +293,23 @@ proc updateCamera(deltaTime: float32) =
   if count == 0:
     return
 
-  # Frustum zoom: zoom out (never in) so every hero fits with margin.
+  # Frustum zoom: zoom out (never in) so every hero fits with margin, but
+  # never past the cave bounds - showing the void around the level (black
+  # bands) looks broken. On caves no wider than the base frustum (cave 1)
+  # this means no zoom at all.
   let
     baseW = cameraHalfW * 2.0
     baseH = cameraHalfH * 2.0
     needW = maxX - minX + CameraMargin * 2.0
     needH = maxY - minY + CameraMargin * 2.0
-    targetW = clamp(max(baseW, needW), baseW, baseW * CameraMaxZoom)
-    targetH = clamp(max(baseH, needH), baseH, baseH * CameraMaxZoom)
+    maxW = max(baseW, min(baseW * CameraMaxZoom, worldMaxX * 2.0))
+    maxH = max(baseH, min(baseH * CameraMaxZoom, worldMaxY * 2.0))
+    targetW = clamp(max(baseW, needW), baseW, maxW)
+    targetH = clamp(max(baseH, needH), baseH, maxH)
     alpha = 1.0'f32 - exp(-CameraLerpRate * deltaTime)
-  cameraHalfW += (targetW * 0.5 - cameraHalfW) * alpha
-  cameraHalfH += (targetH * 0.5 - cameraHalfH) * alpha
+    zoomAlpha = 1.0'f32 - exp(-CameraZoomLerpRate * deltaTime)
+  cameraHalfW += (targetW * 0.5 - cameraHalfW) * zoomAlpha
+  cameraHalfH += (targetH * 0.5 - cameraHalfH) * zoomAlpha
   discard setFrustum(mainCamera, cameraHalfW * 2.0, cameraHalfH * 2.0,
                      cameraNear, cameraFar)
 

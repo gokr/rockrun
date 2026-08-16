@@ -21,6 +21,8 @@ const
   InvulnTime* = 2.5'f32
   ## Camera smoothing rate for the exponentially damped follow.
   CameraLerpRate* = 7.0'f32
+  ## Slower damping for frustum zoom changes (calmer than the follow).
+  CameraZoomLerpRate* = 3.5'f32
   ## Padding around the hero group the camera keeps on screen (px).
   CameraMargin* = 240.0'f32
   ## Maximum camera zoom-out factor (1.0 = base frustum).
