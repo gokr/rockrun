@@ -133,6 +133,29 @@ Administrator (installs Chocolatey, Git, Nim, MinGW); `makeorxwindows.sh`
 builds the bundled `orx.dll` inside the VM. macOS builds ad-hoc sign the
 bundle (users right-click > Open on first launch).
 
+### Installing appimagetool (Ubuntu)
+
+```bash
+# Option 1: .deb package (Ubuntu 22.04+)
+wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage \
+  -O /tmp/appimagetool
+chmod +x /tmp/appimagetool
+sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
+
+# Option 2: extract and keep the full directory (no FUSE needed)
+wget https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage \
+  -O /tmp/appimagetool
+chmod +x /tmp/appimagetool
+/tmp/appimagetool --appimage-extract          # creates ./squashfs-root
+sudo mv squashfs-root /opt/appimagetool
+sudo ln -s /opt/appimagetool/AppRun /usr/local/bin/appimagetool
+```
+
+The extracted `squashfs-root` must stay intact (the `AppRun` script execs
+`usr/bin/appimagetool` relative to itself) - only symlink `AppRun` into
+`/usr/local/bin`. On Ubuntu 24.04+, running AppImage *executables* also
+needs `sudo apt install libfuse2` (fuse3 is not compatible).
+
 ## Running
 
 ```bash
