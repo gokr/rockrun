@@ -68,6 +68,10 @@ Local co-op multiplayer.
 - Digging no longer awards score (diamonds and time bonus only).
 - Respawn picks the nearest free cell: respawning on top of a teammate
   made the sprites overlap, which looked like the wrong player color.
+- Players 2-4 now use their own colored sprite strips (green/blue/brown
+  palette variants cut from the Kenney sheet) instead of a Color tint -
+  each hero is visibly distinct without relying on ORX color
+  multiplication.
 - Countdown beats are all equal (0.5s); the first beat used to be 1.5s
   and the "3" text vanished mid-beat, leaving a blank pause.
 

@@ -70,7 +70,6 @@ type
     creatureSpawns: seq[orxVECTOR]
     moveUntil: array[4, float32]
     respawned: array[4, bool]
-    p2ColorOk: bool
     collectedMid: int
     creaturePath: seq[float32]
     creatureLastPos: seq[orxVECTOR]
@@ -199,7 +198,6 @@ proc runFinalChecksMp() =
   testCheck(not world.players[1].down, "P2 is down after one kill")
   testCheck(world.players[1].obj != nil, "P2 object missing after respawn")
   testCheck(test.respawned[1], "P2 did not respawn at the spawn cell")
-  testCheck(test.p2ColorOk, "P2 respawned with the wrong tint (color FX left residue?)")
   testCheck(test.completed,
     "P1 could not complete the cave through the exit")
   testCheck(cameraHalfW * 2.0 <= worldMaxX * 2.0 + 1.0 and
@@ -458,14 +456,6 @@ proc runTestScript(deltaTime: float32) =
           test.respawned[action.player] =
             hypot(position.fX - spawnPosition.fX,
                   position.fY - spawnPosition.fY) < 10.0
-          # The respawned hero must carry its own config tint again.
-          # ORX object colors are 0..255 floats (SetRGB converts 0..1).
-          var heroColor: orxCOLOR
-          discard getColor(hero.obj, addr heroColor)
-          let rgb = heroColor.anon0.vRGB
-          test.p2ColorOk =
-            abs(rgb.fX - 150.0) < 12.0 and abs(rgb.fY - 255.0) < 12.0 and
-            abs(rgb.fZ - 150.0) < 12.0
     of taCaptureCollected:
       test.collectedMid = gs.collected
     of taScreenshot:

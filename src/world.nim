@@ -52,7 +52,6 @@ type
     digAnimTimer*: float32
     digFlip*: bool
     down*: bool ## out of lives for the run (spectating)
-    color*: orxVECTOR ## config tint (0..1 RGB), re-applied at respawn
 
 const
   ## Sub-grid size per cell (4x4) and block size in pixels.
@@ -327,7 +326,6 @@ proc respawnPlayer*(index: int) =
   if hero.obj == nil or hero.down:
     return
   hero.respawnTimer = 0.0
-  discard setRGB(hero.obj, addr hero.color)
   let position = freeRespawnSpot(index)
   discard hero.obj.setWorldPosition(
     newVector(position.fX, position.fY, PlayerZ))
@@ -557,16 +555,6 @@ proc spawnPlayers*(): bool =
     if hero == nil:
       echo "Could not create the player"
       return false
-    # Config tint, re-applied at spawn and respawn. Must use ORX's
-    # COMPONENT colorspace (raw 0..255) - the same read the object
-    # creation path uses; COLORSPACE_RGB normalizes to 0..1 and writing
-    # that into the raw field garbles the render.
-    var heroColor = newVector(255.0, 255.0, 255.0)
-    if pushSection(configName).isSuccess:
-      if hasValue("Color") == orxTRUE:
-        discard getColorVector("Color", COLORSPACE_COMPONENT, addr heroColor)
-      discard popSection()
-    discard setRGB(hero, addr heroColor)
     let position = cellWorld(spawnPoint.x, spawnPoint.y)
     if hero.setPosition(
         newVector(position.fX, position.fY, PlayerZ)).isFailure:
@@ -578,8 +566,7 @@ proc spawnPlayers*(): bool =
       spawnX: spawnPoint.x,
       spawnY: spawnPoint.y,
       lives: gs.runLives[index],
-      down: gs.runDown[index],
-      color: heroColor))
+      down: gs.runDown[index]))
   result = true
 
 proc buildWorld(level: LevelDef): bool =

@@ -74,8 +74,9 @@ respawn at your spawn point with a short invulnerability window, and the
 cave is never reloaded while teammates are still in the fight. When every
 player is out of lives, the run ends.
 
-Levels carry four spawn points (`@` for P1 plus `2`/`3`/`4`); heroes are
-tinted per player (green/blue/yellow). The camera centers on the group and
+Levels carry four spawn points (`@` for P1 plus `2`/`3`/`4`); each
+player gets their own colored sprite (pink/green/blue/brown palette
+variants from the Kenney sheet). The camera centers on the group and
 zooms out (up to 2.5×) to keep everyone on screen.
 
 ## Controls

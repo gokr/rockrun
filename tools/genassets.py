@@ -252,30 +252,38 @@ def make_firefly(name, body_rgb, wing_rgb, seed):
 
 def make_hero_strips():
     """Cuts the Kenney adventurer sheet (tools/kenney-characters.png,
-    9x3 grid of 24px tiles with 1px spacing) into three animation strips.
-    Row 0 holds the same character model in several palette variants,
-    each a 2-frame walk cycle: green (0-1), blue (2-3), pink (4-5),
-    brown (6-7) - the pink pair is 'player 1'. All strips use the hero's
-    own pink/brown frames so the hero never changes character between
-    states; row 1/2 hold other characters and are not used. A procedural
+    9x3 grid of 24px tiles with 1px spacing) into animation strips.
+    Row 0 holds the same character model in four palette variants, each
+    a 2-frame walk cycle: green (0-1), blue (2-3), pink (4-5),
+    brown (6-7). Player 1 uses the pink pair (base file names); players
+    2-4 get their own colored strips (green/blue/brown). A procedural
     pickaxe swing is drawn over the dig frames so the action reads as
     digging."""
     src = os.path.join(os.path.dirname(__file__), "kenney-characters.png")
     sheet = Image.open(src).convert("RGBA")
-    plans = {
-        "idle": [4, 5],
-        "run": [4, 5, 6, 7],
-        "dig": [4, 5, 4],
-    }
-    for name, sel in plans.items():
-        out = Image.new("RGBA", (24 * len(sel), 24), (0, 0, 0, 0))
-        for n, i in enumerate(sel):
-            col, row = i % 9, i // 9
-            tile = sheet.crop((col * 25, row * 25, col * 25 + 24, row * 25 + 24))
-            if name == "dig":
-                tile = add_pickaxe(tile, n)
-            out.paste(tile, (n * 24, 0), tile)
-        out.save(os.path.join(OUT_DIR, f"{name}.png"))
+    # (file suffix, palette pair on the sheet)
+    palettes = [
+        ("", (4, 5)),   # P1 pink
+        ("2", (0, 1)),  # P2 green
+        ("3", (2, 3)),  # P3 blue
+        ("4", (6, 7)),  # P4 brown
+    ]
+    for suffix, (a, b) in palettes:
+        plans = {
+            f"idle{suffix}": [a, b],
+            f"run{suffix}": [a, b],
+            f"dig{suffix}": [a, b, a],
+        }
+        for name, sel in plans.items():
+            out = Image.new("RGBA", (24 * len(sel), 24), (0, 0, 0, 0))
+            for n, i in enumerate(sel):
+                col, row = i % 9, i // 9
+                tile = sheet.crop(
+                    (col * 25, row * 25, col * 25 + 24, row * 25 + 24))
+                if name.startswith("dig"):
+                    tile = add_pickaxe(tile, n)
+                out.paste(tile, (n * 24, 0), tile)
+            out.save(os.path.join(OUT_DIR, f"{name}.png"))
 
 
 def make_beeps():
