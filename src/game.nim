@@ -21,6 +21,8 @@ const
   InvulnTime* = 2.5'f32
   ## Red viewport flash duration after a death.
   DeathFlashTime* = 0.25'f32
+  ## Round-start countdown: one beep per beat, then the long final one.
+  CountdownBeat* = 0.5'f32
   ## Camera smoothing rate for the exponentially damped follow.
   CameraLerpRate* = 7.0'f32
   ## Slower damping for frustum zoom changes (calmer than the follow).
@@ -40,6 +42,7 @@ type
   Phase* = enum
     phModeSelect
     phIntro
+    phCountdown
     phPlaying
     phPaused
     phComplete
@@ -100,6 +103,7 @@ proc enterPhase*(phase: Phase) =
   gs.phase = phase
   case phase
   of phIntro: gs.phaseTimer = IntroTime
+  of phCountdown: gs.phaseTimer = CountdownBeat * 3.0
   of phComplete: gs.phaseTimer = CompleteTime
   else: gs.phaseTimer = 0.0
   gs.hudDirty = true

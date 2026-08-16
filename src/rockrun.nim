@@ -223,6 +223,16 @@ proc showLevelIntro() =
   ui.showSubMessage(&"Collect {gs.needed} diamonds", IntroTime)
   enterPhase(phIntro)
 
+var
+  countdownStep = 3
+
+proc startCountdown() =
+  ## Round-start beeps: 3, 2, 1, then a long final beep and GO.
+  countdownStep = 3
+  ui.showMessage("3", CountdownBeat)
+  discard audioObject.addSound("BeepSound")
+  enterPhase(phCountdown)
+
 proc reloadLevel() =
   if world.loadWorld(gs.levelIndex):
     creatures.clearCreatures()
@@ -495,18 +505,19 @@ var
 
 proc updateDeathFlash(deltaTime: float32) =
   ## Tints the viewport background red while `gs.deathFlash` counts down,
-  ## then restores the cave background.
+  ## then restores the cave background. ORX colors are 0..1 floats here
+  ## (config 0..255 values get normalized by ORX's own parser).
   if gs.deathFlash > 0.0:
     gs.deathFlash = max(0.0'f32, gs.deathFlash - deltaTime)
     var
-      flashRGB = newVector(190.0, 30.0, 30.0)
+      flashRGB = newVector(0.75, 0.12, 0.12)
       flashColor: orxCOLOR
     discard setColor(addr flashColor, addr flashRGB, 1.0)
     discard setBackgroundColor(mainViewport, addr flashColor)
     viewportFlashActive = true
   elif viewportFlashActive:
     var
-      caveRGB = newVector(9.0, 7.0, 12.0)
+      caveRGB = newVector(0.035, 0.027, 0.047)
       caveColor: orxCOLOR
     discard setColor(addr caveColor, addr caveRGB, 1.0)
     discard setBackgroundColor(mainViewport, addr caveColor)
@@ -560,7 +571,23 @@ proc updateGame(clockInfo: ptr orxCLOCK_INFO; context: pointer) {.cdecl.} =
   of phIntro:
     gs.phaseTimer -= deltaTime
     if gs.phaseTimer <= 0.0:
-      enterPhase(phPlaying)
+      if test.active:
+        # Scripted tests keep the old flow: straight into playing.
+        enterPhase(phPlaying)
+      else:
+        startCountdown()
+  of phCountdown:
+    gs.phaseTimer -= deltaTime
+    if gs.phaseTimer <= 0.0:
+      if countdownStep > 1:
+        dec countdownStep
+        gs.phaseTimer = CountdownBeat
+        ui.showMessage($countdownStep, CountdownBeat)
+        discard audioObject.addSound("BeepSound")
+      else:
+        ui.showMessage("GO!", 0.8)
+        discard audioObject.addSound("BeepGoSound")
+        enterPhase(phPlaying)
   of phPlaying:
     gs.timeLeft = max(0.0'f32, gs.timeLeft - deltaTime)
     if gs.timeLeft <= 0.0 and not gs.timeExpired:
@@ -713,7 +740,8 @@ proc runConfigChecks(): bool =
 
   when not defined(testNoSoundCheck):
     for section in ["DigSound", "PushSound", "LandSound", "ClinkSound",
-                    "CollectSound", "WinSound", "LoseSound", "ExitOpenSound",
+                    "CollectSound", "WinSound", "LoseSound",
+                    "ExitOpenSound", "BeepSound", "BeepGoSound",
                     "GameMusic"]:
       let sound = soundCreateFromConfig(section)
       if sound == nil:

@@ -14,6 +14,7 @@ import random
 # Output next to the repo the script lives in (was hardcoded to the
 # main worktree, which corrupts it when run from a worktree).
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "texture")
+SOUND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "sound")
 
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -277,6 +278,33 @@ def make_hero_strips():
         out.save(os.path.join(OUT_DIR, f"{name}.png"))
 
 
+def make_beeps():
+    """Synthesizes the countdown beeps as 16-bit mono WAVs: a short
+    880Hz 'beep' and the long 660Hz final 'BEEEEP'."""
+    import wave
+    import struct
+    rate = 22050
+
+    def tone(freq, dur, vol=0.5):
+        n = int(rate * dur)
+        frames = bytearray()
+        for i in range(n):
+            t = i / rate
+            # quick attack, gentle release - no clicks
+            env = min(1.0, t / 0.01, (dur - t) / 0.03)
+            sample = int(vol * 32767 * env * math.sin(2 * math.pi * freq * t))
+            frames += struct.pack('<h', sample)
+        return bytes(frames)
+
+    for name, freq, dur in (("beep", 880.0, 0.12), ("beep_go", 660.0, 0.7)):
+        with wave.open(os.path.join(SOUND_DIR, name + ".wav"), 'wb') as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            w.writeframes(tone(freq, dur))
+    print("wrote beep sounds")
+
+
 def add_pickaxe(tile, step):
     """Draws a clearly visible swinging pickaxe over a dig frame:
     step 0 winds up, step 1 is overhead, step 2 is swung down in front."""
@@ -317,4 +345,5 @@ if __name__ == "__main__":
     make_firefly("firefly", (90, 235, 225), (40, 190, 210), 51)
     make_firefly("butterfly", (225, 95, 235), (160, 60, 190), 77)
     make_hero_strips()
+    make_beeps()
     print("wrote textures")

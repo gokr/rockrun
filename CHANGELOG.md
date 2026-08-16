@@ -40,6 +40,14 @@ Local co-op multiplayer.
   names the fallen player and cause ("P2 - CRUSHED BY A BOULDER") with
   their remaining lives, and the corpse blinks at ~10Hz until it
   respawns.
+- Round-start countdown: after the cave intro, 3-2-1 beeps
+  (synthesized WAVs) and a long final beep with GO! before play starts.
+- Creature steering now matches the original Boulder Dash rule: go
+  straight while the cell ahead is free, turn right (firefly, clockwise
+  wall patrol) or left (butterfly) only when blocked. Previously the
+  turn was preferred over straight, which made creatures zigzag across
+  wide shafts and orbit in small squares in open halls instead of
+  following the walls.
 
 ## [1.0.0] - 2026-08-16
 

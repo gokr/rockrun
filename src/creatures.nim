@@ -65,13 +65,19 @@ proc turnLeft(dx, dy: int): tuple[x, y: int] = (dy, -dx)
 proc turnRight(dx, dy: int): tuple[x, y: int] = (-dy, dx)
 
 proc chooseDirection(creature: var Creature) =
-  ## Classic wall-hugging preference order at a cell center.
+  ## Classic Boulder Dash wall-hugging at a cell center: go STRAIGHT as
+  ## long as the cell ahead is free; only when blocked, turn right
+  ## (firefly, wall on the left, clockwise patrol) or left (butterfly,
+  ## counter-clockwise); then the other turn; then reverse. The
+  ## straight-first order is what makes creatures follow walls and
+  ## patrol the perimeter of open areas - trying the turn first makes
+  ## them zigzag across wide corridors and orbit in small squares.
   let (dx, dy) = (creature.dirX, creature.dirY)
   var options: array[4, tuple[x, y: int]]
   if creature.kind == ckFirefly:
-    options = [turnRight(dx, dy), (dx, dy), turnLeft(dx, dy), (-dx, -dy)]
+    options = [(dx, dy), turnRight(dx, dy), turnLeft(dx, dy), (-dx, -dy)]
   else:
-    options = [turnLeft(dx, dy), (dx, dy), turnRight(dx, dy), (-dx, -dy)]
+    options = [(dx, dy), turnLeft(dx, dy), turnRight(dx, dy), (-dx, -dy)]
   for option in options:
     let nx = creature.cellX + option.x
     let ny = creature.cellY + option.y
