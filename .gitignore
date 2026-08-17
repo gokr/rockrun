@@ -5,6 +5,9 @@
 
 # Test artifacts
 /screenshots/
+# Vagrant machine state (Vagrantfile is tracked)
+.vagrant/
+
 # OS/editor noise
 .DS_Store
 __pycache__/
